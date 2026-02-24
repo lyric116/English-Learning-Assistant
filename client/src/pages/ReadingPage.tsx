@@ -19,6 +19,7 @@ import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 import type { ReadingContent, VocabItem } from '@/types';
 
 export function ReadingPage() {
+  const quizContextKey = 'quizCurrentReading';
   const navigate = useNavigate();
   const { speak, speaking } = useTts();
   const { toast } = useToast();
@@ -28,6 +29,7 @@ export function ReadingPage() {
   const [reading, setReading] = useState<ReadingContent | null>(null);
   const [viewMode, setViewMode] = useState<'alternate' | 'parallel'>('alternate');
   const [, setHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
+  const [, setQuizReadingContext] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [favorites, setFavorites] = useLocalStorage<ReadingContent[]>('readingFavorites', []);
   const [showFavorites, setShowFavorites] = useState(false);
 
@@ -40,6 +42,7 @@ export function ReadingPage() {
       const result = await api.reading.generate(inputText, language) as ReadingContent;
       setReading(result);
       const withTimestamp = { ...result, timestamp: Date.now() };
+      setQuizReadingContext(withTimestamp);
       setHistory(prev => [withTimestamp, ...prev].slice(0, 10));
       toast('双语内容生成成功', 'success');
     } catch (err) {
@@ -62,11 +65,13 @@ export function ReadingPage() {
 
   const goToQuiz = () => {
     if (!reading) return;
+    setQuizReadingContext(reading);
     navigate('/quiz', { state: { currentReading: reading } });
   };
 
   const loadFavorite = (fav: ReadingContent) => {
     setReading(fav);
+    setQuizReadingContext(fav);
     setShowFavorites(false);
   };
 

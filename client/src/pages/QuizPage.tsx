@@ -18,10 +18,11 @@ import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 type Phase = 'select' | 'quiz' | 'result';
 
 export function QuizPage() {
+  const quizContextKey = 'quizCurrentReading';
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const currentReading = (location.state as { currentReading?: ReadingContent })?.currentReading ?? null;
+  const routeReading = (location.state as { currentReading?: ReadingContent })?.currentReading ?? null;
 
   const [phase, setPhase] = useState<Phase>('select');
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,16 @@ export function QuizPage() {
   const [answered, setAnswered] = useState(false);
   const [testType, setTestType] = useState<'reading' | 'vocabulary'>('reading');
   const [showReview, setShowReview] = useState(false);
+  const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
+  const currentReading = routeReading ?? storedReading;
+  const restoredFromStorage = !routeReading && !!storedReading;
+
+  useEffect(() => {
+    if (routeReading) {
+      setStoredReading(routeReading);
+    }
+  }, [routeReading, setStoredReading]);
 
   const startQuiz = async (type: 'reading' | 'vocabulary') => {
     if (!currentReading) {
@@ -170,6 +180,11 @@ export function QuizPage() {
               {currentReading.title && (
                 <p className="col-span-full text-center text-sm text-muted-foreground">
                   当前阅读：<span className="font-medium text-foreground">{currentReading.title}</span>
+                </p>
+              )}
+              {restoredFromStorage && (
+                <p className="col-span-full text-center text-xs text-muted-foreground">
+                  已从本地恢复上次阅读上下文（页面刷新后仍可继续测试）。
                 </p>
               )}
             </div>

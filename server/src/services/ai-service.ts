@@ -7,6 +7,7 @@ import {
   buildVocabularyQuestionsPrompt,
   buildLearningReportPrompt,
 } from '../utils/prompt-builder';
+import { config } from '../config';
 
 interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
@@ -16,6 +17,10 @@ interface AIConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+}
+
+interface ErrorBody {
+  error?: { message?: string };
 }
 
 function isPrivateOrLocalhost(hostname: string): boolean {
@@ -42,7 +47,23 @@ function isPrivateOrLocalhost(hostname: string): boolean {
   return false;
 }
 
-function validateBaseUrl(baseUrl: string): void {
+function sanitizeErrorText(text: string): string {
+  const sanitized = text
+    .replace(/sk-[A-Za-z0-9_-]+/g, '[REDACTED_KEY]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/\-=]+/gi, 'Bearer [REDACTED_TOKEN]')
+    .replace(/"apiKey"\s*:\s*"[^"]+"/gi, '"apiKey":"[REDACTED_KEY]"');
+
+  return sanitized.length > 240 ? `${sanitized.slice(0, 240)}...` : sanitized;
+}
+
+function getErrorMessageFromBody(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+
+  const maybeMessage = (body as ErrorBody).error?.message;
+  return typeof maybeMessage === 'string' ? maybeMessage : undefined;
+}
+
+function validateBaseUrl(baseUrl: string): string {
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
@@ -59,14 +80,14 @@ function validateBaseUrl(baseUrl: string): void {
     throw new Error('Base URL 仅支持 HTTP/HTTPS');
   }
 
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = config.nodeEnv === 'production';
   if (isProd && protocol !== 'https:') {
     throw new Error('生产环境仅允许 HTTPS Base URL');
   }
 
   const host = parsed.hostname.toLowerCase();
-  if (isProd && isPrivateOrLocalhost(host)) {
-    throw new Error('生产环境不允许访问本地或内网地址');
+  if (!config.ai.allowPrivateHosts && isPrivateOrLocalhost(host)) {
+    throw new Error('Base URL 不允许访问本地或内网地址');
   }
 
   const allowedHosts = (process.env.ALLOWED_AI_HOSTS || '')
@@ -77,6 +98,8 @@ function validateBaseUrl(baseUrl: string): void {
   if (allowedHosts.length > 0 && !allowedHosts.includes(host)) {
     throw new Error('当前 Base URL 不在允许列表中');
   }
+
+  return baseUrl.replace(/\/+$/, '');
 }
 
 function buildCompletionsEndpoint(baseUrl: string): string {
@@ -84,36 +107,70 @@ function buildCompletionsEndpoint(baseUrl: string): string {
 }
 
 function validateAIConfig(aiConfig?: AIConfig): asserts aiConfig is AIConfig {
-  if (!aiConfig?.apiKey || !aiConfig?.baseUrl || !aiConfig?.model) {
+  if (!aiConfig) {
     throw new Error('请先在页面设置中配置 AI 服务（API Key、Base URL、Model）');
   }
-  validateBaseUrl(aiConfig.baseUrl);
+
+  const apiKey = aiConfig?.apiKey?.trim();
+  const baseUrl = aiConfig?.baseUrl?.trim();
+  const model = aiConfig?.model?.trim();
+
+  if (!apiKey || !baseUrl || !model) {
+    throw new Error('请先在页面设置中配置 AI 服务（API Key、Base URL、Model）');
+  }
+
+  aiConfig.apiKey = apiKey;
+  aiConfig.model = model;
+  aiConfig.baseUrl = validateBaseUrl(baseUrl);
+}
+
+async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unknown>): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.ai.requestTimeoutMs);
+
+  try {
+    return await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${aiConfig.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`AI 请求超时（>${Math.floor(config.ai.requestTimeoutMs / 1000)}s）`);
+    }
+    const fallback = err instanceof Error ? err.message : '未知网络错误';
+    throw new Error(`AI 请求失败: ${sanitizeErrorText(fallback)}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function sendRequest(prompt: string, options: { temperature?: number; maxTokens?: number } = {}, aiConfig?: AIConfig): Promise<string> {
   validateAIConfig(aiConfig);
 
-  const res = await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${aiConfig.apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await postChatCompletions(aiConfig, {
       model: aiConfig.model,
       messages: [{ role: 'user', content: prompt }],
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 2000,
-    }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`API请求失败: ${(err as any).error?.message || res.statusText}`);
+    const errBody = await res.json().catch(() => undefined);
+    const upstreamMessage = getErrorMessageFromBody(errBody) || res.statusText || '未知上游错误';
+    throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
   }
 
   const data = (await res.json()) as ChatCompletionResponse;
-  return data.choices[0].message.content;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('AI 返回内容为空，请稍后重试');
+  }
+  return content;
 }
 
 export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
@@ -159,22 +216,16 @@ export async function generateLearningReport(reportType: string, learningData: u
 export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
   validateAIConfig(aiConfig);
 
-  const res = await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${aiConfig.apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await postChatCompletions(aiConfig, {
       model: aiConfig.model,
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 5,
-    }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`连接失败: ${(err as any).error?.message || res.statusText}`);
+    const errBody = await res.json().catch(() => undefined);
+    const upstreamMessage = getErrorMessageFromBody(errBody) || res.statusText || '未知上游错误';
+    throw new Error(`连接失败: ${sanitizeErrorText(upstreamMessage)}`);
   }
 
   await res.json();

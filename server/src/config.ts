@@ -8,4 +8,8 @@ export const config = {
     windowMs: 60 * 1000,
     max: 20,
   },
+  ai: {
+    requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '45000', 10),
+    allowPrivateHosts: process.env.ALLOW_PRIVATE_AI_HOSTS === '1',
+  },
 };

@@ -7,6 +7,7 @@ import { SentenceAnalysisPage } from '@/pages/SentenceAnalysisPage';
 import { ReadingPage } from '@/pages/ReadingPage';
 import { QuizPage } from '@/pages/QuizPage';
 import { AchievementsPage } from '@/pages/AchievementsPage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/reading" element={<ReadingPage />} />
             <Route path="/quiz" element={<QuizPage />} />
             <Route path="/achievements" element={<AchievementsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </ToastProvider>

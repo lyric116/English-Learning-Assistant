@@ -21,6 +21,25 @@ app.get('/api/v1/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// API base route
+app.get('/api/v1', (_req, res) => {
+  res.json({
+    service: 'english-learning-api',
+    status: 'ok',
+    version: 'v1',
+    endpoints: [
+      'GET /api/v1/health',
+      'POST /api/v1/ai/test',
+      'POST /api/v1/flashcards/extract',
+      'POST /api/v1/sentence/analyze',
+      'POST /api/v1/reading/generate',
+      'POST /api/v1/quiz/reading-questions',
+      'POST /api/v1/quiz/vocabulary-questions',
+      'POST /api/v1/report/generate',
+    ],
+  });
+});
+
 // AI connection test
 app.post('/api/v1/ai/test', async (req, res, next) => {
   try {
@@ -38,6 +57,9 @@ app.use('/api/v1/sentence', sentenceRouter);
 app.use('/api/v1/reading', readingRouter);
 app.use('/api/v1/quiz', quizRouter);
 app.use('/api/v1/report', reportRouter);
+app.use('/api/v1', (_req, res) => {
+  res.status(404).json({ error: 'API 路由不存在' });
+});
 
 app.use(errorHandler);
 

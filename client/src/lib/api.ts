@@ -1,7 +1,14 @@
 import type { AIConfig } from '@/types';
 import { STORAGE_KEY } from './ai-providers';
+import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage';
+import { getAnonymousSessionId } from './session';
 
 const API_BASE = '/api/v1';
+const REQUEST_TIMEOUT_MS = 30_000;
+
+function isAiRequest(url: string, method: string): boolean {
+  return method === 'POST' && url !== '/health';
+}
 
 function getAIConfig(): AIConfig | null {
   try {
@@ -16,9 +23,10 @@ function getAIConfig(): AIConfig | null {
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const finalOptions = { ...options };
+  const method = (finalOptions.method || 'GET').toUpperCase();
 
   // Auto-inject aiConfig into POST body
-  if (finalOptions.method === 'POST' && typeof finalOptions.body === 'string') {
+  if (method === 'POST' && typeof finalOptions.body === 'string') {
     const aiConfig = getAIConfig();
     if (aiConfig) {
       try {
@@ -32,15 +40,44 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     }
   }
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...finalOptions,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || '请求失败');
+  if (isAiRequest(url, method)) {
+    const allowed = shouldAllowCallOverLimit();
+    if (!allowed) {
+      throw new Error('已取消本次 AI 调用');
+    }
+    recordAiCall();
   }
-  return res.json();
+
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const headers = new Headers(finalOptions.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  headers.set('x-anonymous-session-id', getAnonymousSessionId());
+
+  try {
+    const res = await fetch(`${API_BASE}${url}`, {
+      ...finalOptions,
+      method,
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || '请求失败');
+    }
+
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(`请求超时（>${REQUEST_TIMEOUT_MS / 1000}s），请稍后重试`);
+    }
+    throw err;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
 }
 
 export const api = {

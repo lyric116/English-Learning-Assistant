@@ -152,7 +152,7 @@ export function ReadingPage() {
                     </div>
                     <button
                       onClick={e => { e.stopPropagation(); removeFavorite(fav); }}
-                      className="p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                      className="p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
                       title="移除收藏"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -268,7 +268,7 @@ export function ReadingPage() {
                       <p className="font-bold text-primary-600 dark:text-primary-400">{v.word}</p>
                       <button
                         onClick={() => speak(v.word)}
-                        className="p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary-500"
+                        className="p-1 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary-500"
                         title="朗读单词"
                       >
                         <Volume2 className="h-3.5 w-3.5" />

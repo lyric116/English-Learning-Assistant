@@ -1,5 +1,24 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: `P1-03` Reconciliation Across All Modules
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: bilingual reading flow with favorites and vocabulary actions.
+- Changes:
+  - action icon buttons (`remove favorite`, `speak vocabulary`) are now visible in baseline state instead of hover-only
+  - improves readability/discoverability on touch devices and non-hover contexts
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz answering flow with keyboard hint guidance.
+- Changes:
+  - fixed hidden keyboard hint text (`按 1-4`) by removing ineffective hover-only opacity rule
+  - ensures hint remains readable for all interaction modes
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: report generation and progress visualization.
+- Audit result:
+  - no additional contrast remediation required in this pass; existing primary text/button contrast remained acceptable
+
 ## Update 2026-02-25: Contrast Readability Audit (`P1-03`)
 
 ### `client/src/pages/FlashcardsPage.tsx`

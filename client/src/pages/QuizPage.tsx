@@ -246,7 +246,7 @@ export function QuizPage() {
                        String.fromCharCode(65 + i)}
                     </span>
                     <span className="flex-1">{opt}</span>
-                    <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100">
+                    <span className="text-xs text-muted-foreground">
                       {!answered && `按 ${i + 1}`}
                     </span>
                   </div>

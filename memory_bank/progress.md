@@ -1,5 +1,23 @@
 # Progress Log
 
+## 2026-02-25 (followup/p1-03-all-module-reconciliation)
+
+### Completed
+- Performed a full-module re-audit for `P1-03` after user feedback (not limited to Home/Flashcards/Sentence).
+- Applied missed readability/visibility fixes in remaining modules:
+  - `ReadingPage`: action icons no longer depend on hover-only visibility (now visible in baseline state).
+  - `QuizPage`: keyboard hint text no longer hidden by `opacity-0 group-hover` pattern.
+- Final scope now covers all five modules:
+  - Flashcards, Sentence, Reading, Quiz, Achievements (Achievements verified as no additional contrast fix required).
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-03` should be considered fully reconciled at cross-module level.
+- Continue with `P1-04` (button style unification).
+
 ## 2026-02-25 (complete/p1-03-contrast-readability-audit)
 
 ### Completed

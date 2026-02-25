@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-r-04-favorites-tag-search-sort)
+
+### Completed
+- Completed `P2-R-04` (阅读收藏管理增强).
+- Favorites data model upgraded:
+  - introduced `ReadingFavorite` with `savedAt` + `tags`
+  - added runtime migration for legacy favorites (auto补齐 `savedAt/tags`)
+- Reading favorites UI enhancements:
+  - tag management: add/remove tags per favorite
+  - search: keyword filter across title/content/tags
+  - sort: latest/earliest/title/vocabulary-count
+  - filtered-result count and empty-result feedback
+- Favorite creation now carries generation-derived tags (topic/difficulty/length labels) as initial metadata.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-R-04` is complete; reading favorites now support long-term retrieval workflows (tag/search/sort).
+- Next step is `P2-R-06` (阅读模块回归测试; `P2-R-05` 已 out-of-order 完成).
+
 ## 2026-02-25 (complete/p2-r-03-reading-control-panel-upgrade)
 
 ### Completed

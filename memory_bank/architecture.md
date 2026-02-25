@@ -1,5 +1,26 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Reading Favorites Retrieval Upgrade (`P2-R-04`)
+
+### `client/src/types/index.ts`
+- Role: reading-favorite persistence contract.
+- Changes:
+  - introduced `ReadingFavorite` (extends reading content with `savedAt` + `tags`)
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: favorites management and retrieval interface.
+- Changes:
+  - favorites storage upgraded to typed `ReadingFavorite[]`
+  - added legacy favorite migration (`savedAt/tags`补齐)
+  - added retrieval controls:
+    - keyword search
+    - sort mode selection
+    - per-item tag add/remove
+  - favorites list now shows filter result counts and empty-search fallback
+  - favorite creation seeds initial tags from generation config
+- Architectural impact:
+  - favorites are now queryable data assets rather than plain snapshots, enabling long-cycle review workflows.
+
 ## Update 2026-02-25: Reading Control Panel Upgrade (`P2-R-03`)
 
 ### `client/src/pages/ReadingPage.tsx`

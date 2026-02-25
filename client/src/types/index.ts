@@ -99,6 +99,11 @@ export interface ReadingContent {
   generationConfig?: ReadingGenerationConfig;
 }
 
+export interface ReadingFavorite extends ReadingContent {
+  savedAt: number;
+  tags: string[];
+}
+
 // Quiz
 export interface QuizQuestion {
   question: string;

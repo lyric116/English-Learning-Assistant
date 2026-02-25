@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
+import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -15,12 +16,13 @@ import { ModuleSection } from '@/components/layout/ModuleSection';
 import {
   Volume2, Bookmark, BookmarkCheck, FileQuestion,
   ArrowLeftRight, BookOpen, X, Sparkles, Languages,
-  ChevronDown, Trash2,
+  ChevronDown, Trash2, Search,
 } from 'lucide-react';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 import type {
   ReadingContent,
   ReadingDifficulty,
+  ReadingFavorite,
   ReadingGenerationConfig,
   ReadingLanguage,
   ReadingLength,
@@ -58,6 +60,22 @@ const TOPIC_OPTIONS: ReadingTopic[] = ['general', 'work', 'travel', 'technology'
 const DIFFICULTY_OPTIONS: ReadingDifficulty[] = ['easy', 'medium', 'hard'];
 const LENGTH_OPTIONS: ReadingLength[] = ['short', 'medium', 'long'];
 const LANGUAGE_OPTIONS: ReadingLanguage[] = ['en', 'zh'];
+type FavoriteSortMode = 'saved-desc' | 'saved-asc' | 'title-asc' | 'vocab-desc';
+
+function normalizeFavorite(item: ReadingContent | ReadingFavorite): ReadingFavorite {
+  const savedAt = typeof (item as ReadingFavorite).savedAt === 'number'
+    ? (item as ReadingFavorite).savedAt
+    : Date.now();
+  const tags = Array.isArray((item as ReadingFavorite).tags)
+    ? (item as ReadingFavorite).tags.filter(tag => typeof tag === 'string' && tag.trim()).map(tag => tag.trim())
+    : [];
+
+  return {
+    ...item,
+    savedAt,
+    tags,
+  };
+}
 
 const READING_PRESETS: Array<{
   id: string;
@@ -107,8 +125,10 @@ export function ReadingPage() {
   const [viewMode, setViewMode] = useState<'alternate' | 'parallel'>('alternate');
   const [, setHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
   const [, setQuizReadingContext] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
-  const [favorites, setFavorites] = useLocalStorage<ReadingContent[]>('readingFavorites', []);
+  const [favorites, setFavorites] = useLocalStorage<ReadingFavorite[]>('readingFavorites', []);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [favoriteQuery, setFavoriteQuery] = useState('');
+  const [favoriteSort, setFavoriteSort] = useState<FavoriteSortMode>('saved-desc');
 
   const isFavorited = reading ? favorites.some(f => f.english === reading.english) : false;
   const activePreset = READING_PRESETS.find(preset => (
@@ -116,6 +136,43 @@ export function ReadingPage() {
     && preset.config.difficulty === difficulty
     && preset.config.length === length
   ))?.id;
+
+  useEffect(() => {
+    const hasLegacy = favorites.some(item => (
+      typeof item.savedAt !== 'number'
+      || !Array.isArray(item.tags)
+    ));
+    if (!hasLegacy) return;
+    setFavorites(prev => prev.map(item => normalizeFavorite(item)));
+  }, [favorites, setFavorites]);
+
+  const filteredFavorites = useMemo(() => {
+    const keyword = favoriteQuery.trim().toLowerCase();
+    const filtered = favorites.filter(item => {
+      if (!keyword) return true;
+      const haystack = [
+        item.title || '',
+        item.english || '',
+        item.chinese || '',
+        ...(item.tags || []),
+      ].join(' ').toLowerCase();
+      return haystack.includes(keyword);
+    });
+
+    return [...filtered].sort((a, b) => {
+      switch (favoriteSort) {
+        case 'saved-asc':
+          return a.savedAt - b.savedAt;
+        case 'title-asc':
+          return (a.title || '').localeCompare(b.title || '', 'zh-Hans-CN');
+        case 'vocab-desc':
+          return (b.vocabulary?.length || 0) - (a.vocabulary?.length || 0);
+        case 'saved-desc':
+        default:
+          return b.savedAt - a.savedAt;
+      }
+    });
+  }, [favoriteQuery, favoriteSort, favorites]);
 
   const generate = async () => {
     if (!inputText.trim()) return;
@@ -152,7 +209,15 @@ export function ReadingPage() {
       setFavorites(prev => prev.filter(f => f.english !== reading.english));
       toast('已取消收藏', 'info');
     } else {
-      setFavorites(prev => [...prev, { ...reading, savedAt: Date.now() } as ReadingContent & { savedAt: number }]);
+      const generatedTags = reading.generationConfig
+        ? [
+            TOPIC_LABELS[reading.generationConfig.topic],
+            DIFFICULTY_LABELS[reading.generationConfig.difficulty],
+            LENGTH_LABELS[reading.generationConfig.length],
+          ]
+        : [];
+      const nextFavorite = normalizeFavorite({ ...reading, savedAt: Date.now(), tags: generatedTags });
+      setFavorites(prev => [nextFavorite, ...prev.filter(item => item.english !== reading.english)]);
       toast('已保存到收藏', 'success');
     }
   };
@@ -163,15 +228,35 @@ export function ReadingPage() {
     navigate('/quiz', { state: { currentReading: reading } });
   };
 
-  const loadFavorite = (fav: ReadingContent) => {
+  const loadFavorite = (fav: ReadingFavorite) => {
     setReading(fav);
     setQuizReadingContext(fav);
     setShowFavorites(false);
   };
 
-  const removeFavorite = (fav: ReadingContent) => {
+  const removeFavorite = (fav: ReadingFavorite) => {
     setFavorites(prev => prev.filter(f => f.english !== fav.english));
     toast('已移除收藏', 'info');
+  };
+
+  const addFavoriteTag = (fav: ReadingFavorite) => {
+    const tag = window.prompt('输入标签名称（例如：考试 / 语法 / 商务）')?.trim();
+    if (!tag) return;
+    setFavorites(prev => prev.map(item => {
+      if (item.english !== fav.english) return item;
+      const nextTags = Array.from(new Set([...item.tags, tag])).slice(0, 8);
+      return { ...item, tags: nextTags };
+    }));
+    toast('标签已更新', 'success');
+  };
+
+  const removeFavoriteTag = (fav: ReadingFavorite, tag: string) => {
+    setFavorites(prev => prev.map(item => (
+      item.english === fav.english
+        ? { ...item, tags: item.tags.filter(t => t !== tag) }
+        : item
+    )));
+    toast('标签已移除', 'info');
   };
 
   const applyPreset = (presetId: string) => {
@@ -405,34 +490,80 @@ export function ReadingPage() {
               <ChevronDown className={`h-4 w-4 text-muted-foreground ml-auto transition-transform ${showFavorites ? 'rotate-180' : ''}`} />
             </button>
             {showFavorites && (
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in-up">
-                {favorites.map((fav, i) => (
-                  <div
-                    key={i}
-                    className="analysis-item group cursor-pointer"
-                    style={{ '--item-color': '#f59e0b' } as React.CSSProperties}
-                    onClick={() => loadFavorite(fav)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="typo-h3 truncate">{fav.title || '无标题'}</p>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-serif italic">
-                          {fav.english.slice(0, 120)}{fav.english.length > 120 ? '...' : ''}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1.5">
-                          {fav.vocabulary?.length || 0} 个词汇
-                        </p>
-                      </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); removeFavorite(fav); }}
-                        className="tap-target p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
-                        title="移除收藏"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+              <div className="mt-3 animate-fade-in-up">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[220px] flex-1">
+                    <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={favoriteQuery}
+                      onChange={e => setFavoriteQuery(e.target.value)}
+                      className="pl-8 h-9"
+                      placeholder="搜索标题 / 内容 / 标签"
+                    />
                   </div>
-                ))}
+                  <Select value={favoriteSort} onChange={e => setFavoriteSort(e.target.value as FavoriteSortMode)}>
+                    <option value="saved-desc">最新收藏</option>
+                    <option value="saved-asc">最早收藏</option>
+                    <option value="title-asc">按标题</option>
+                    <option value="vocab-desc">按词汇数</option>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">显示 {filteredFavorites.length}/{favorites.length}</span>
+                </div>
+
+                {filteredFavorites.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filteredFavorites.map((fav, i) => (
+                      <div
+                        key={i}
+                        className="analysis-item group cursor-pointer"
+                        style={{ '--item-color': '#f59e0b' } as React.CSSProperties}
+                        onClick={() => loadFavorite(fav)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="typo-h3 truncate">{fav.title || '无标题'}</p>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-serif italic">
+                              {fav.english.slice(0, 120)}{fav.english.length > 120 ? '...' : ''}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              {fav.vocabulary?.length || 0} 个词汇 · 收藏于 {new Date(fav.savedAt).toLocaleDateString()}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {fav.tags.map(tag => (
+                                <button
+                                  key={tag}
+                                  onClick={e => { e.stopPropagation(); removeFavoriteTag(fav, tag); }}
+                                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-900/35 dark:text-amber-300"
+                                  title="点击移除标签"
+                                >
+                                  {tag}
+                                  <span className="text-[10px] opacity-80">x</span>
+                                </button>
+                              ))}
+                              <button
+                                onClick={e => { e.stopPropagation(); addFavoriteTag(fav); }}
+                                className="rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary-300 hover:text-primary-600"
+                              >
+                                + 标签
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); removeFavorite(fav); }}
+                            className="tap-target p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                            title="移除收藏"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <p className="typo-body-sm text-muted-foreground">没有匹配结果，调整关键词或排序后再试。</p>
+                  </Card>
+                )}
               </div>
             )}
           </div>

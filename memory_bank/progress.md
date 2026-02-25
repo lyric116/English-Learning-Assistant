@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-05-scoring-feedback-unification)
+
+### Completed
+- Completed `P2-Q-05` (判分与解析展示规则统一).
+- Added centralized scoring helper (`calculateQuizMetrics`) and unified score semantics:
+  - total / answered / unanswered / correct / incorrect / accuracy / score
+  - final submit and result rendering now share one metric source
+- In-question feedback standardized:
+  - 明确展示“你的答案 / 正确答案 / 解析”
+  - 未作答场景在错题回顾中有显式提示
+- Result/history display upgraded:
+  - result panel now shows作答率、作答正确率、未作答数量
+  - history records continue using统一 score semantics，并补充用时显示
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-05` is complete; quiz scoring and explanation display logic now uses one consistent metric contract.
+- Next step is `P2-Q-06` (测验模块回归测试).
+
 ## 2026-02-25 (complete/p2-q-04-timed-quiz-runtime)
 
 ### Completed

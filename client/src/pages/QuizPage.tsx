@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -32,6 +32,58 @@ const QUIZ_DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
   hard: '高阶',
 };
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20];
+
+interface QuizMetrics {
+  total: number;
+  answered: number;
+  unanswered: number;
+  correct: number;
+  incorrect: number;
+  accuracy: number;
+  score: number;
+}
+
+function calculateQuizMetrics(questions: QuizQuestion[], userAnswers: Array<number | null>): QuizMetrics {
+  const total = questions.length;
+  if (total === 0) {
+    return {
+      total: 0,
+      answered: 0,
+      unanswered: 0,
+      correct: 0,
+      incorrect: 0,
+      accuracy: 0,
+      score: 0,
+    };
+  }
+
+  let answered = 0;
+  let correct = 0;
+  questions.forEach((question, index) => {
+    const userAnswer = userAnswers[index];
+    if (typeof userAnswer === 'number') {
+      answered += 1;
+    }
+    if (userAnswer === question.correctIndex) {
+      correct += 1;
+    }
+  });
+
+  const unanswered = total - answered;
+  const incorrect = total - correct;
+  const score = Math.round((correct / total) * 100);
+  const accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+
+  return {
+    total,
+    answered,
+    unanswered,
+    correct,
+    incorrect,
+    accuracy,
+    score,
+  };
+}
 
 function createWrongQuestionId(type: 'reading' | 'vocabulary', question: string): string {
   return `${type}:${question.trim().toLowerCase()}`;
@@ -234,8 +286,7 @@ export function QuizPage() {
 
   const finalizeQuiz = useCallback((reason: 'complete' | 'timeout' = 'complete') => {
     if (phase !== 'quiz' || questions.length === 0) return;
-    const correct = userAnswers.filter((a, i) => a === questions[i].correctIndex).length;
-    const score = Math.round((correct / questions.length) * 100);
+    const metrics = calculateQuizMetrics(questions, userAnswers);
     const timeSpentSeconds = quizStartedAt
       ? Math.max(1, Math.round((Date.now() - quizStartedAt) / 1000))
       : undefined;
@@ -249,7 +300,7 @@ export function QuizPage() {
       .filter(item => item.userAnswer !== item.question.correctIndex);
     setTestHistory(prev => [...prev, {
       type: testType,
-      score,
+      score: metrics.score,
       date: new Date().toISOString(),
       readingTitle: currentReading?.title || '未知阅读',
       questionCount: activeConfig?.questionCount ?? questions.length,
@@ -351,9 +402,7 @@ export function QuizPage() {
     finalizeQuiz('timeout');
   }, [activeConfig?.timedMode, finalizeQuiz, phase, remainingSeconds]);
 
-  const correctCount = userAnswers.filter((a, i) => a === questions[i]?.correctIndex).length;
-  const wrongCount = questions.length - correctCount;
-  const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
+  const metrics = useMemo(() => calculateQuizMetrics(questions, userAnswers), [questions, userAnswers]);
   const q = questions[qIndex];
 
   const wrongQuestions = questions
@@ -369,8 +418,8 @@ export function QuizPage() {
   const timerText = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
   const timerUrgent = remainingSeconds !== null && remainingSeconds <= 60;
 
-  const scoreColor = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-yellow-500' : 'text-red-500';
-  const scoreEmoji = score >= 90 ? '🎉' : score >= 70 ? '👍' : score >= 50 ? '💪' : '📚';
+  const scoreColor = metrics.score >= 80 ? 'text-green-500' : metrics.score >= 60 ? 'text-yellow-500' : 'text-red-500';
+  const scoreEmoji = metrics.score >= 90 ? '🎉' : metrics.score >= 70 ? '👍' : metrics.score >= 50 ? '💪' : '📚';
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
@@ -621,10 +670,26 @@ export function QuizPage() {
                   );
                 })}
               </div>
-              {answered && q.explanation && (
-                <div className="analysis-item mt-4 text-sm" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
-                  <span className="font-semibold text-primary-700 dark:text-primary-300">解释：</span>
-                  <span className="text-primary-800 dark:text-primary-200">{q.explanation}</span>
+              {answered && (
+                <div className="analysis-item mt-4 text-sm space-y-1" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
+                  <p>
+                    <span className="font-semibold text-primary-700 dark:text-primary-300">你的答案：</span>
+                    <span className="text-primary-800 dark:text-primary-200">
+                      {typeof userAnswers[qIndex] === 'number'
+                        ? `${String.fromCharCode(65 + userAnswers[qIndex]!)}. ${q.options[userAnswers[qIndex]!] || ''}`
+                        : '未作答'}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="font-semibold text-primary-700 dark:text-primary-300">正确答案：</span>
+                    <span className="text-primary-800 dark:text-primary-200">
+                      {String.fromCharCode(65 + q.correctIndex)}. {q.options[q.correctIndex]}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="font-semibold text-primary-700 dark:text-primary-300">解析：</span>
+                    <span className="text-primary-800 dark:text-primary-200">{q.explanation || '暂无解析'}</span>
+                  </p>
                 </div>
               )}
             </Card>
@@ -653,19 +718,22 @@ export function QuizPage() {
               <h2 className="typo-h2 mb-1">
                 {testType === 'reading' ? '阅读理解测试' : '词汇测试'} 完成
               </h2>
-              <p className={cn('text-6xl font-bold my-6', scoreColor)}>{score}%</p>
+              <p className={cn('text-6xl font-bold my-6', scoreColor)}>{metrics.score}%</p>
               <div className="flex justify-center gap-8 mb-6">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium">正确 {correctCount}</span>
+                  <span className="font-medium">正确 {metrics.correct}</span>
                 </div>
                 <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                   <XCircle className="h-5 w-5" />
-                  <span className="font-medium">错误 {wrongCount}</span>
+                  <span className="font-medium">错误 {metrics.incorrect}</span>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mb-6">
+                作答率 {metrics.answered}/{metrics.total} · 作答正确率 {metrics.accuracy}% · 未作答 {metrics.unanswered}
+              </p>
 
-              {score < 80 && (
+              {metrics.score < 80 && (
                 <div className="mb-6 text-left text-sm">
                   <p className="analysis-card-header !mb-3 justify-center">
                     <AlertTriangle className="h-4 w-4 text-yellow-500" /> <span className="font-semibold">改进建议</span>
@@ -679,10 +747,10 @@ export function QuizPage() {
               )}
 
               <div className="flex flex-wrap justify-center gap-3">
-                {wrongCount > 0 && (
+                {metrics.incorrect > 0 && (
                   <Button variant="secondary" onClick={() => setShowReview(!showReview)}>
                     <AlertTriangle className="h-4 w-4 mr-1.5" />
-                    {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
+                    {showReview ? '收起错题' : `查看错题 (${metrics.incorrect})`}
                   </Button>
                 )}
                 <Button
@@ -729,6 +797,9 @@ export function QuizPage() {
                         </div>
                       ))}
                     </div>
+                    {wq.userAnswer === null && (
+                      <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">该题未作答（可能因提前交卷或限时结束）</p>
+                    )}
                     {wq.explanation && (
                       <p className="mt-3 text-sm text-muted-foreground">
                         <span className="font-medium">解释：</span>{wq.explanation}
@@ -769,6 +840,9 @@ export function QuizPage() {
                   <span className="text-muted-foreground">
                     {item.questionCount ?? 5}题 · {item.difficulty ? QUIZ_DIFFICULTY_LABELS[item.difficulty] : '进阶'}
                   </span>
+                  {item.timeSpentSeconds ? (
+                    <span className="text-muted-foreground">用时 {Math.round(item.timeSpentSeconds / 60)} 分</span>
+                  ) : null}
                   <span className="font-semibold text-primary-600 dark:text-primary-400">{item.score} 分</span>
                 </div>
               ))}

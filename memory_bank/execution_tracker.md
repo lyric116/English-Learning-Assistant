@@ -43,7 +43,7 @@
 | 37 | P2-Q-02 | completed | Introduced wrong-question-book model (`wrongQuestionBook`) with repeat tracking, wrong-reason metadata, first/last practice timestamps, and quiz-finish write-back pipeline. |
 | 38 | P2-Q-03 | completed | Added wrong-question retry flow in both Quiz and Achievements entries; both paths use the same `wrongQuestionBook` filter/sort strategy and only load wrong items by type. |
 | 39 | P2-Q-04 | completed | Implemented timed quiz runtime: countdown display, early submit, timeout auto-submit, and timeout notification; timer state resets correctly across mode switches. |
-| 40 | P2-Q-05 | pending | Not started. |
+| 40 | P2-Q-05 | completed | Unified quiz scoring/accuracy metrics via shared calculation, standardized in-question feedback (your answer + correct answer + explanation), and aligned result/history displays with consistent score semantics. |
 | 41 | P2-Q-06 | pending | Not started. |
 | 42 | P2-A-01 | pending | Not started. |
 | 43 | P2-A-02 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-Q-05`.
+- First not-yet-completed step: `P2-Q-06`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -1,5 +1,22 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Quiz Scoring & Feedback Unification (`P2-Q-05`)
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz scoring/output contract owner.
+- Changes:
+  - introduced shared metric calculator `calculateQuizMetrics`
+  - both finalization path and UI result rendering now consume the same metric object
+  - standardized per-question feedback block:
+    - user answer
+    - correct answer
+    - explanation
+  - standardized result summary with answered/unanswered and accuracy signals
+  - wrong-review view now explicitly marks unanswered items
+
+### Architectural Impact
+- Eliminates duplicated score logic branches in quiz flow and establishes one reusable metric contract for future analytics/report ingestion.
+
 ## Update 2026-02-25: Timed Quiz Runtime (`P2-Q-04`)
 
 ### `client/src/pages/QuizPage.tsx`

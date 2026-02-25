@@ -59,6 +59,38 @@ const DIFFICULTY_OPTIONS: ReadingDifficulty[] = ['easy', 'medium', 'hard'];
 const LENGTH_OPTIONS: ReadingLength[] = ['short', 'medium', 'long'];
 const LANGUAGE_OPTIONS: ReadingLanguage[] = ['en', 'zh'];
 
+const READING_PRESETS: Array<{
+  id: string;
+  label: string;
+  description: string;
+  config: Pick<ReadingGenerationConfig, 'topic' | 'difficulty' | 'length'>;
+}> = [
+  {
+    id: 'daily-quick',
+    label: '日常速读',
+    description: '综合主题，短篇，快速进入学习状态',
+    config: { topic: 'general', difficulty: 'easy', length: 'short' },
+  },
+  {
+    id: 'work-drill',
+    label: '职场演练',
+    description: '职场主题，中等难度，中篇输出',
+    config: { topic: 'work', difficulty: 'medium', length: 'medium' },
+  },
+  {
+    id: 'travel-dialog',
+    label: '旅行场景',
+    description: '旅行主题，基础难度，短篇对话友好',
+    config: { topic: 'travel', difficulty: 'easy', length: 'short' },
+  },
+  {
+    id: 'tech-advanced',
+    label: '科技进阶',
+    description: '科技主题，高阶难度，长篇信息密度高',
+    config: { topic: 'technology', difficulty: 'hard', length: 'long' },
+  },
+];
+
 export function ReadingPage() {
   const quizContextKey = 'quizCurrentReading';
   const navigate = useNavigate();
@@ -79,6 +111,11 @@ export function ReadingPage() {
   const [showFavorites, setShowFavorites] = useState(false);
 
   const isFavorited = reading ? favorites.some(f => f.english === reading.english) : false;
+  const activePreset = READING_PRESETS.find(preset => (
+    preset.config.topic === topic
+    && preset.config.difficulty === difficulty
+    && preset.config.length === length
+  ))?.id;
 
   const generate = async () => {
     if (!inputText.trim()) return;
@@ -135,6 +172,15 @@ export function ReadingPage() {
   const removeFavorite = (fav: ReadingContent) => {
     setFavorites(prev => prev.filter(f => f.english !== fav.english));
     toast('已移除收藏', 'info');
+  };
+
+  const applyPreset = (presetId: string) => {
+    const preset = READING_PRESETS.find(item => item.id === presetId);
+    if (!preset) return;
+    setTopic(preset.config.topic);
+    setDifficulty(preset.config.difficulty);
+    setLength(preset.config.length);
+    toast(`已应用模板：${preset.label}`, 'info');
   };
 
   const enParagraphs = reading?.english.split('\n').filter(p => p.trim()) || [];
@@ -201,7 +247,29 @@ export function ReadingPage() {
             </Button>
             <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">支持任意长度文本</span>
           </div>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {READING_PRESETS.map(preset => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyPreset(preset.id)}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  activePreset === preset.id
+                    ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/30'
+                    : 'border-border/60 hover:border-primary-300 bg-muted/20'
+                }`}
+              >
+                <p className="text-sm font-medium text-foreground">{preset.label}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{preset.description}</p>
+              </button>
+            ))}
+          </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {activePreset && (
+              <span className="rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2.5 py-1">
+                模板: {READING_PRESETS.find(item => item.id === activePreset)?.label}
+              </span>
+            )}
             <span className="rounded-full bg-muted px-2.5 py-1">方向: {LANGUAGE_LABELS[language]}</span>
             <span className="rounded-full bg-muted px-2.5 py-1">主题: {TOPIC_LABELS[topic]}</span>
             <span className="rounded-full bg-muted px-2.5 py-1">难度: {DIFFICULTY_LABELS[difficulty]}</span>

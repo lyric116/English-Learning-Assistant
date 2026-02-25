@@ -1,5 +1,30 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-r-03-reading-control-panel-upgrade)
+
+### Completed
+- Completed `P2-R-03` (阅读控制面板升级).
+- Reading page now includes preset template controls:
+  - 日常速读 / 职场演练 / 旅行场景 / 科技进阶
+  - preset click updates `topic/difficulty/length` in one step
+- Expanded control panel now clearly exposes:
+  - language direction
+  - topic
+  - difficulty
+  - length
+- Added visible config summary chips:
+  - active template (if any)
+  - direction/topic/difficulty/length
+  - result panel also echoes `generationConfig` summary to keep display and request consistent
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-R-03` is complete; reading parameter control UX now supports presets and explicit config visibility.
+- Next step is `P2-R-04` (阅读收藏管理增强：标签/搜索/排序).
+
 ## 2026-02-25 (complete/p2-r-02-reading-backend-sync)
 
 ### Completed

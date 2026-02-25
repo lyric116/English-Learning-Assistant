@@ -1,5 +1,17 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Reading Control Panel Upgrade (`P2-R-03`)
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: reading generation control cockpit.
+- Changes:
+  - added preset template registry (`READING_PRESETS`) for common config combinations
+  - added `activePreset` derivation and one-click preset apply flow
+  - control panel now surfaces full parameter set (`language/topic/difficulty/length`)
+  - input/result zones both render config summary chips to preserve request/result context consistency
+- UX impact:
+  - lowers configuration friction while keeping parameter state explicit and reviewable.
+
 ## Update 2026-02-25: Reading Backend Contract Sync (`P2-R-02`)
 
 ### `server/src/utils/request-validator.ts`

@@ -35,7 +35,7 @@
 | 29 | P2-S-05 | completed | Sentence regression checklist executed (`code/sentence_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
 | 30 | P2-R-01 | completed | Reading page now supports configurable generation params (`topic/difficulty/length/language`) and sends them via API payload; local result metadata includes generation config for history replay. |
 | 31 | P2-R-02 | completed | Backend reading generation now validates `topic/difficulty/length`, syncs prompt rules with new params, and normalizes AI response to stable bilingual+vocabulary shape. |
-| 32 | P2-R-03 | pending | Not started. |
+| 32 | P2-R-03 | completed | Reading control panel upgraded with preset templates, difficulty/length options, and visible config summary aligned with request params. |
 | 33 | P2-R-04 | pending | Not started. |
 | 34 | P2-R-05 | completed (out-of-order) | Reading->Quiz context persistence implemented on 2026-02-24 (see `progress.md`). |
 | 35 | P2-R-06 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-R-03`.
+- First not-yet-completed step: `P2-R-04`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -1,5 +1,24 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-s-04-study-note-export)
+
+### Completed
+- Completed `P2-S-04` (句子分析导出学习笔记 + 历史沉淀).
+- Added readable note-export flow in `SentenceAnalysisPage`:
+  - `buildStudyNote` generates copy-friendly study notes (原句 / 结构 / 语法要点 / 关键短语)
+  - export action copies note to clipboard (not raw JSON) and persists to `sentenceNotesHistory`
+- Added note history panel in sentence history zone:
+  - displays recent exported notes with timestamp
+  - supports one-click re-copy and note-history clear action
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-S-04` is complete; sentence results can now be exported as reusable study notes and accumulated in local history.
+- Next step is `P2-S-05` (句子模块回归测试).
+
 ## 2026-02-25 (complete/p2-s-03-grammar-phrase-linkage)
 
 ### Completed

@@ -49,6 +49,12 @@ interface AnalysisRecord {
   timestamp: number;
 }
 
+interface SentenceNoteRecord {
+  sentence: string;
+  note: string;
+  timestamp: number;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
 }
@@ -166,6 +172,44 @@ function normalizeSentenceAnalysis(value: unknown): SentenceAnalysis {
   };
 }
 
+function buildStudyNote(sentence: string, analysis: SentenceAnalysis): string {
+  const structureBlock = [
+    `- 类型: ${analysis.structure.type || '未识别句型'}`,
+    `- 句型公式: ${analysis.structure.pattern || '未返回'}`,
+    `- 说明: ${analysis.structure.explanation || '未返回结构解释'}`,
+  ].join('\n');
+
+  const grammarBlock = analysis.grammarPoints.length > 0
+    ? analysis.grammarPoints.map((item, index) => {
+      const tags = item.tags.length > 0 ? `（${item.tags.join(' / ')}）` : '';
+      return `${index + 1}. ${item.title || '语法点'}${tags}\n   - ${item.explanation || '未返回解释'}`;
+    }).join('\n')
+    : '- 未检测到明确语法点';
+
+  const phraseBlock = analysis.phrases.length > 0
+    ? analysis.phrases.slice(0, 6).map(item => (
+      `- ${item.text || '短语'}（${item.category || '未分类'}）: ${item.explanation || '未返回解释'}`
+    )).join('\n')
+    : '- 未检测到关键短语';
+
+  return [
+    '# 句子学习笔记',
+    `- 导出时间: ${new Date().toLocaleString()}`,
+    '',
+    '## 原句',
+    sentence,
+    '',
+    '## 句子结构',
+    structureBlock,
+    '',
+    '## 语法要点',
+    grammarBlock,
+    '',
+    '## 关键短语',
+    phraseBlock,
+  ].join('\n');
+}
+
 export function SentenceAnalysisPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -176,6 +220,7 @@ export function SentenceAnalysisPage() {
   const [activeGrammarIndex, setActiveGrammarIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
+  const [noteHistory, setNoteHistory] = useLocalStorage<SentenceNoteRecord[]>('sentenceNotesHistory', []);
   const { toast } = useToast();
 
   const wordLookup = useMemo(() => {
@@ -286,6 +331,22 @@ export function SentenceAnalysisPage() {
     setActiveWordKey(null);
     setActiveGrammarIndex(null);
     setErrorMessage('');
+  };
+
+  const exportStudyNote = async () => {
+    if (!result || !input.trim()) return;
+    const note = buildStudyNote(input.trim(), result);
+    await navigator.clipboard.writeText(note);
+    setNoteHistory(prev => [
+      { sentence: input.trim(), note, timestamp: Date.now() },
+      ...prev.filter(item => item.sentence !== input.trim()),
+    ].slice(0, 6));
+    toast('学习笔记已复制，并保存到历史', 'success');
+  };
+
+  const copyHistoryNote = async (record: SentenceNoteRecord) => {
+    await navigator.clipboard.writeText(record.note);
+    toast('已复制历史笔记', 'success');
   };
 
   return (
@@ -693,32 +754,61 @@ export function SentenceAnalysisPage() {
         title="最近分析历史"
         description="保留最近 3 条分析记录，可一键重新加载。"
       >
-        <Card>
-          {history.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
-                <History className="h-3.5 w-3.5" /> 最近分析
-              </span>
-              {history.map((h, i) => (
-                <button
-                  key={i}
-                  onClick={() => loadRecord(h)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs rounded-full border transition-all max-w-[260px] truncate',
-                    h.sentence === input
-                      ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                      : 'border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400',
-                  )}
-                  title={h.sentence}
-                >
-                  {h.sentence}
-                </button>
-              ))}
+        <div className="space-y-4">
+          <Card>
+            {history.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+                  <History className="h-3.5 w-3.5" /> 最近分析
+                </span>
+                {history.map((h, i) => (
+                  <button
+                    key={i}
+                    onClick={() => loadRecord(h)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs rounded-full border transition-all max-w-[260px] truncate',
+                      h.sentence === input
+                        ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                        : 'border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400',
+                    )}
+                    title={h.sentence}
+                  >
+                    {h.sentence}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="typo-body-sm text-muted-foreground">暂无历史记录，先完成一次句子分析。</p>
+            )}
+          </Card>
+
+          <Card>
+            <div className="analysis-card-header">
+              <Copy className="h-4 w-4 text-indigo-500" />
+              <h3 className="font-bold">学习笔记历史</h3>
             </div>
-          ) : (
-            <p className="typo-body-sm text-muted-foreground">暂无历史记录，先完成一次句子分析。</p>
-          )}
-        </Card>
+            {noteHistory.length > 0 ? (
+              <div className="space-y-2">
+                {noteHistory.map((item, index) => (
+                  <div
+                    key={`${item.sentence}-${index}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.sentence}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(item.timestamp).toLocaleString()}</p>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => copyHistoryNote(item)}>
+                      复制笔记
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="typo-body-sm text-muted-foreground">暂无导出笔记，点击“导出学习笔记”后会保存到这里。</p>
+            )}
+          </Card>
+        </div>
       </ModuleSection>
 
       <ModuleSection
@@ -735,11 +825,17 @@ export function SentenceAnalysisPage() {
             <Button variant="secondary" size="sm" onClick={copyResult} disabled={!result}>
               复制结果
             </Button>
+            <Button variant="secondary" size="sm" onClick={exportStudyNote} disabled={!result}>
+              导出学习笔记
+            </Button>
             <Button variant="ghost" size="sm" onClick={clearCurrent}>
               清空当前
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setHistory([])} disabled={history.length === 0}>
               清空历史
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setNoteHistory([])} disabled={noteHistory.length === 0}>
+              清空笔记
             </Button>
           </div>
         </Card>

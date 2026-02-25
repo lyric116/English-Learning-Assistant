@@ -1,5 +1,20 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Sentence Study Note Export (`P2-S-04`)
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: sentence analysis export and knowledge capture surface.
+- Changes:
+  - added `buildStudyNote` formatter to output human-readable note text (not raw JSON)
+  - added `exportStudyNote` action:
+    - copies note to clipboard
+    - persists note snapshot into localStorage (`sentenceNotesHistory`)
+  - added note-history UI block in history section:
+    - shows exported sentence notes with timestamps
+    - supports one-click re-copy and clear-history action
+- Architectural impact:
+  - sentence analysis now has an explicit “analysis -> note -> reuse” persistence loop.
+
 ## Update 2026-02-25: Grammar-Phrase Linkage (`P2-S-03`)
 
 ### `client/src/pages/SentenceAnalysisPage.tsx`

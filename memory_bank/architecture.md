@@ -1,5 +1,19 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Session Token Flow Design (`P3-02`)
+
+### `code/session_token_flow_design.md`
+- Role: token lifecycle contract document for session implementation phase.
+- Contents:
+  - token/identifier roles (`anonymous-session-id`, `access_token`, `refresh_token`)
+  - client-server transfer contract (Authorization header + HttpOnly refresh cookie + anonymous context header)
+  - recommended session endpoints (`bootstrap/login/refresh/logout/me`)
+  - lifecycle state machine (create/refresh/expire/recover)
+  - reproducible scenario scripts for first visit, page refresh restore, and token expiry
+
+### Architectural Impact
+- Converts session strategy (P3-01) into executable token-flow contract, reducing ambiguity before database/session persistence modeling.
+
 ## Update 2026-02-25: Session & User Strategy ADR (`P3-01`)
 
 ### `code/session_user_strategy_decision.md`

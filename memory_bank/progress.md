@@ -1,5 +1,24 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-02-session-token-flow)
+
+### Completed
+- Completed `P3-02` (会话令牌流转设计).
+- Added design doc: `code/session_token_flow_design.md`.
+- Document now defines:
+  - 令牌模型：`x-anonymous-session-id` / `access_token` / `refresh_token`
+  - 前后端传递约定（header + cookie）
+  - 核心会话接口建议（bootstrap/login/refresh/logout/me）
+  - 会话生命周期闭环（创建/刷新/失效/恢复）
+  - 三类可复现场景（首次访问、刷新恢复、失效重登）
+
+### Validation Performed
+- 文档检查：首次访问、刷新、失效三类场景均有明确行为与复现步骤 ✅
+
+### Notes For Next Developer
+- `P3-02` is complete; token lifecycle contract is now ready for data-model and migration implementation.
+- Next step is `P3-03` (数据库模型设计与索引策略).
+
 ## 2026-02-25 (complete/p3-01-session-user-strategy)
 
 ### Completed

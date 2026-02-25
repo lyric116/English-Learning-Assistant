@@ -1,5 +1,33 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcard Extraction Parameter & Contract Upgrade (`P2-F-02`)
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard extraction parameter entry and extraction flow orchestrator.
+- Changes:
+  - added UI control for extraction count (`maxWords`)
+  - extraction now sends user-chosen `maxWords` + difficulty level
+  - added client-side boundary check for invalid extraction count
+
+### `client/src/lib/api.ts`
+- Role: client API contract boundary.
+- Changes:
+  - flashcard extraction level typed to strict union (`all/cet4/cet6/advanced`)
+  - keeps request body aligned with backend-validated extraction payload
+
+### `server/src/utils/request-validator.ts`
+- Role: backend extraction payload validation source.
+- Changes:
+  - flashcard extraction count range tightened from `1..50` to `1..30`
+  - keeps extraction payload within practical generation limits
+
+### `server/src/routes/flashcards.ts`
+- Role: extraction response contract gateway.
+- Changes:
+  - added response normalizer for AI extraction output
+  - enforces stable word schema on route boundary
+  - introduces explicit failures for invalid AI return shape / empty valid extraction results
+
 ## Update 2026-02-25: Flashcard Model Extension (`P2-F-01`)
 
 ### `client/src/types/index.ts`

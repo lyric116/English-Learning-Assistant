@@ -5,6 +5,7 @@ import { getAnonymousSessionId } from './session';
 
 const API_BASE = '/api/v1';
 const REQUEST_TIMEOUT_MS = 95_000;
+type FlashcardLevel = 'all' | 'cet4' | 'cet6' | 'advanced';
 
 function isAiRequest(url: string, method: string): boolean {
   return method === 'POST' && url !== '/health';
@@ -82,7 +83,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   flashcards: {
-    extract: (text: string, maxWords?: number, level?: string) =>
+    extract: (text: string, maxWords?: number, level?: FlashcardLevel) =>
       request('/flashcards/extract', {
         method: 'POST',
         body: JSON.stringify({ text, maxWords, level }),

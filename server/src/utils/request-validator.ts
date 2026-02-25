@@ -54,6 +54,8 @@ interface AiTestPayload {
 type ObjectRecord = Record<string, unknown>;
 
 const MAX_FLASHCARDS_TEXT_LENGTH = 8_000;
+const MIN_FLASHCARDS_WORDS = 1;
+const MAX_FLASHCARDS_WORDS = 30;
 const MAX_SENTENCE_LENGTH = 1_000;
 const MAX_READING_LENGTH = 200_000;
 const MAX_API_KEY_LENGTH = 2_048;
@@ -186,7 +188,7 @@ export function validateFlashcardsExtractPayload(body: unknown): FlashcardsExtra
   const obj = ensureObject(body);
 
   const text = readRequiredString(obj, 'text', '文本内容', MAX_FLASHCARDS_TEXT_LENGTH);
-  const maxWords = readOptionalInteger(obj, 'maxWords', 10, '提词数量', 1, 50);
+  const maxWords = readOptionalInteger(obj, 'maxWords', 10, '提词数量', MIN_FLASHCARDS_WORDS, MAX_FLASHCARDS_WORDS);
   const level = readOptionalEnum(obj, 'level', 'all', '词汇难度', ['all', 'cet4', 'cet6', 'advanced'] as const);
   const aiConfig = readOptionalAiConfig(obj);
 

@@ -52,7 +52,8 @@ function normalizeWord(raw: RawWord, now: number): Word {
 export function FlashcardsPage() {
   const [words, setWords] = useLocalStorage<Word[]>('flashcards', []);
   const [inputText, setInputText] = useState('');
-  const [level, setLevel] = useState('all');
+  const [level, setLevel] = useState<'all' | 'cet4' | 'cet6' | 'advanced'>('all');
+  const [maxWords, setMaxWords] = useState(10);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -67,10 +68,14 @@ export function FlashcardsPage() {
 
   const handleExtract = async () => {
     if (!inputText.trim()) return;
+    if (maxWords < 1 || maxWords > 30) {
+      toast('提词数量必须在 1 到 30 之间', 'warning');
+      return;
+    }
     setErrorMessage('');
     setLoading(true);
     try {
-      const result = await api.flashcards.extract(inputText, 10, level) as RawWord[];
+      const result = await api.flashcards.extract(inputText, maxWords, level) as RawWord[];
       if (result.length === 0) {
         toast('未能提取到单词，请尝试更长的文本', 'warning');
         return;
@@ -189,15 +194,23 @@ export function FlashcardsPage() {
             onChange={e => setInputText(e.target.value)}
           />
           <div className="flex flex-wrap items-center gap-3 mt-4">
-            <Select value={level} onChange={e => setLevel(e.target.value)}>
+            <Select value={level} onChange={e => setLevel(e.target.value as 'all' | 'cet4' | 'cet6' | 'advanced')}>
               <option value="all">全部级别</option>
               <option value="cet4">CET-4 以上</option>
               <option value="cet6">CET-6 以上</option>
               <option value="advanced">高级词汇</option>
             </Select>
+            <Select value={String(maxWords)} onChange={e => setMaxWords(Number(e.target.value))}>
+              <option value="5">5 词</option>
+              <option value="10">10 词</option>
+              <option value="15">15 词</option>
+              <option value="20">20 词</option>
+              <option value="30">30 词</option>
+            </Select>
             <Button onClick={handleExtract} loading={loading} disabled={!inputText.trim()}>
               提取单词
             </Button>
+            <span className="text-xs text-muted-foreground">当前提词上限 {maxWords}</span>
             {inputText && (
               <Button variant="ghost" size="sm" onClick={() => setInputText('')}>
                 <RotateCcw className="h-3.5 w-3.5" /> 清空

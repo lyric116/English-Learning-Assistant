@@ -1,5 +1,29 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-02-extraction-params-and-contract)
+
+### Completed
+- Completed `P2-F-02` (flashcard extraction parameter + response contract upgrade).
+- Frontend upgrade:
+  - flashcards input now supports configurable extraction count (`5/10/15/20/30`)
+  - request now carries user-selected `maxWords` and difficulty level
+  - added preflight boundary guard for invalid extraction count
+- Backend upgrade:
+  - `validateFlashcardsExtractPayload` tightened `maxWords` bounds to `1..30`
+  - flashcards route now normalizes AI return payload to stable word schema
+  - explicit failure messages added for invalid/non-array extraction response and empty valid items
+- API typing upgrade:
+  - flashcard level now typed as union (`all/cet4/cet6/advanced`) in client API layer.
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-F-02` is complete with clear parameter boundary behavior and stricter extraction response contract.
+- Next step is `P2-F-03` (mastered/new/review state operation in flashcards).
+
 ## 2026-02-25 (complete/p2-f-01-flashcard-model-extension)
 
 ### Completed

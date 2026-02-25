@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-r-06-reading-regression)
+
+### Completed
+- Completed `P2-R-06` (阅读模块回归测试).
+- Added regression artifact: `code/reading_regression_checklist.md`.
+- Regression scope includes:
+  - 参数切换与配置摘要一致性
+  - 模板预设切换
+  - 收藏标签/搜索/排序
+  - 阅读到测验上下文衔接
+  - 错误提示与恢复
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-R-06` is complete; reading phase is fully closed (`P2-R-05` had already been completed out-of-order).
+- Next step is `P2-Q-01` (测验模块参数扩展).
+
 ## 2026-02-25 (complete/p2-r-04-favorites-tag-search-sort)
 
 ### Completed

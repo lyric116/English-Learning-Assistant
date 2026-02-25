@@ -1,5 +1,23 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Reading Regression Closure (`P2-R-06`)
+
+### `code/reading_regression_checklist.md`
+- Role: reading module regression execution record.
+- Scope captured:
+  - generation parameter switching + summary consistency
+  - preset switching
+  - favorites retrieval flow (tag/search/sort)
+  - reading-to-quiz context continuity
+  - error handling and recovery path
+- Gate evidence:
+  - `cd server && npm run build`
+  - `cd client && npm run lint`
+  - `cd client && npm run build`
+
+### Reliability Impact
+- Reading phase now has a formal regression closure artifact, enabling future change impact checks against a stable baseline.
+
 ## Update 2026-02-25: Reading Favorites Retrieval Upgrade (`P2-R-04`)
 
 ### `client/src/types/index.ts`

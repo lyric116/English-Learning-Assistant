@@ -49,7 +49,7 @@
 | 43 | P2-A-02 | completed | Added achievements trend metrics (`学习频次/测试正确率/新增错题`) and data-driven personalized suggestions, with template-profile rendering + history reload compatibility. |
 | 44 | P2-A-03 | completed | Upgraded share flow to structured content with title/summary/key metrics/trends/actions preview + one-click clipboard copy. |
 | 45 | P2-A-04 | completed | Achievements regression checklist executed (`code/achievements_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
-| 46 | P3-01 | pending | Not started. |
+| 46 | P3-01 | completed | Added session/user strategy ADR (`code/session_user_strategy_decision.md`) covering lifecycle, permission boundaries, and anonymous->login migration strategy. |
 | 47 | P3-02 | pending | Not started. |
 | 48 | P3-03 | pending | Not started. |
 | 49 | P3-04 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P3-01`.
+- First not-yet-completed step: `P3-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -1,5 +1,23 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-01-session-user-strategy)
+
+### Completed
+- Completed `P3-01` (会话与用户策略确定).
+- Added architecture decision doc: `code/session_user_strategy_decision.md`.
+- Document now defines:
+  - 双轨身份模型（匿名会话 / 登录用户）
+  - 匿名与登录会话生命周期（创建、使用、刷新、失效、恢复）
+  - 权限边界（能力范围、可见性、安全约束）
+  - 匿名到登录迁移策略（并存、双写回填、切换收敛、冲突规则）
+
+### Validation Performed
+- 文档检查：已覆盖计划要求三项必备内容（生命周期 / 权限边界 / 迁移策略）✅
+
+### Notes For Next Developer
+- `P3-01` is complete; this ADR is now the baseline contract for `P3-02` token lifecycle design.
+- Next step is `P3-02` (会话令牌流转机制设计).
+
 ## 2026-02-25 (complete/p2-a-04-achievements-regression)
 
 ### Completed

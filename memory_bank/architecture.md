@@ -1,5 +1,19 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Session & User Strategy ADR (`P3-01`)
+
+### `code/session_user_strategy_decision.md`
+- Role: identity/session architecture decision baseline for P3 migration phase.
+- Contents:
+  - current anonymous-session implementation baseline (`anonymous-session-id` + request header propagation)
+  - dual-track identity model boundary (`anonymous session` vs `authenticated user`)
+  - lifecycle definitions for anonymous and login sessions
+  - permission boundary matrix and service-side security constraints
+  - phased migration strategy (`并存 -> 双写回填 -> 切换收敛`) with conflict resolution rules
+
+### Architectural Impact
+- Establishes a stable contract for upcoming token-flow and persistence migration tasks, preventing P3 implementation drift across frontend/server data ownership decisions.
+
 ## Update 2026-02-25: Achievements Regression Closure (`P2-A-04`)
 
 ### `code/achievements_regression_checklist.md`

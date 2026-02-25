@@ -1,5 +1,30 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcard Model Extension (`P2-F-01`)
+
+### `client/src/types/index.ts`
+- Role: frontend domain contract registry.
+- Changes:
+  - extended `Word` with learning lifecycle fields:
+    - `learningStatus`
+    - `nextReviewAt`
+    - `accuracy`
+    - `reviewCount`
+  - added `WordLearningStatus` type alias
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard extraction + study runtime.
+- Changes:
+  - added V2 model guard + normalizer for incoming/stored words
+  - added one-shot legacy localStorage migration to keep old datasets readable
+  - extraction result path now initializes new lifecycle fields
+  - UI now renders lifecycle fields (status/accuracy/review count/next review)
+  - history zone now summarizes status distribution and due-review count
+
+### Compatibility Note
+- Old `flashcards` localStorage payloads without lifecycle fields are auto-normalized at runtime.
+- New payloads are persisted in V2 shape, enabling subsequent spaced-review logic steps.
+
 ## Update 2026-02-25: Motion & Responsive Polish (`P1-10`)
 
 ### `client/src/index.css`

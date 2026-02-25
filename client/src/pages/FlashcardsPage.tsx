@@ -14,7 +14,40 @@ import { cn } from '@/lib/utils';
 import { ModuleSection } from '@/components/layout/ModuleSection';
 import { ChevronLeft, ChevronRight, Volume2, RotateCcw, Layers, BookOpen, Lightbulb, MessageSquareQuote } from 'lucide-react';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
-import type { Word } from '@/types';
+import type { Word, WordLearningStatus } from '@/types';
+
+type RawWord = Omit<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'reviewCount'>
+  & Partial<Pick<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'reviewCount'>>;
+
+const REVIEW_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const STATUS_LABEL: Record<WordLearningStatus, string> = {
+  new: '新词',
+  reviewing: '复习中',
+  mastered: '已掌握',
+};
+
+function isWordModelV2(word: RawWord): word is Word {
+  return (
+    (word.learningStatus === 'new' || word.learningStatus === 'reviewing' || word.learningStatus === 'mastered')
+    && typeof word.nextReviewAt === 'number'
+    && typeof word.accuracy === 'number'
+    && typeof word.reviewCount === 'number'
+  );
+}
+
+function normalizeWord(raw: RawWord, now: number): Word {
+  const reviewCount = typeof raw.reviewCount === 'number' && raw.reviewCount >= 0 ? raw.reviewCount : 0;
+  const accuracy = typeof raw.accuracy === 'number' && raw.accuracy >= 0 ? raw.accuracy : 0;
+  const learningStatus: WordLearningStatus = raw.learningStatus ?? 'new';
+  const nextReviewAt = typeof raw.nextReviewAt === 'number' ? raw.nextReviewAt : now + REVIEW_INTERVAL_MS;
+  return {
+    ...raw,
+    learningStatus,
+    nextReviewAt,
+    accuracy,
+    reviewCount,
+  };
+}
 
 export function FlashcardsPage() {
   const [words, setWords] = useLocalStorage<Word[]>('flashcards', []);
@@ -37,16 +70,21 @@ export function FlashcardsPage() {
     setErrorMessage('');
     setLoading(true);
     try {
-      const result = await api.flashcards.extract(inputText, 10, level) as Word[];
+      const result = await api.flashcards.extract(inputText, 10, level) as RawWord[];
       if (result.length === 0) {
         toast('未能提取到单词，请尝试更长的文本', 'warning');
         return;
       }
-      setWords(result);
+      const now = Date.now();
+      const normalizedResult = result.map(item => normalizeWord(
+        { ...item, learningStatus: 'new', reviewCount: 0, accuracy: 0, nextReviewAt: now + REVIEW_INTERVAL_MS },
+        now,
+      ));
+      setWords(normalizedResult);
       setCurrentIndex(0);
       setFlipped(false);
       setErrorMessage('');
-      toast(`成功提取 ${result.length} 个单词`, 'success');
+      toast(`成功提取 ${normalizedResult.length} 个单词`, 'success');
     } catch (err) {
       const message = (err as Error).message;
       setErrorMessage(message);
@@ -64,6 +102,13 @@ export function FlashcardsPage() {
     });
     setFlipped(false);
   }, [words.length]);
+
+  useEffect(() => {
+    const hasLegacyData = words.some(word => !isWordModelV2(word as RawWord));
+    if (!hasLegacyData) return;
+    const now = Date.now();
+    setWords(words.map(word => normalizeWord(word as RawWord, now)));
+  }, [words, setWords]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -106,6 +151,12 @@ export function FlashcardsPage() {
 
   const word = words[currentIndex];
   const progress = words.length > 0 ? ((currentIndex + 1) / words.length) * 100 : 0;
+  const now = Date.now();
+  const statusSummary = words.reduce<Record<WordLearningStatus, number>>((acc, item) => {
+    acc[item.learningStatus] += 1;
+    return acc;
+  }, { new: 0, reviewing: 0, mastered: 0 });
+  const dueReviewCount = words.filter(item => item.nextReviewAt <= now).length;
   const clearWordSet = () => {
     setWords([]);
     setCurrentIndex(0);
@@ -203,6 +254,17 @@ export function FlashcardsPage() {
                         </p>
                         <div className="w-12 h-0.5 bg-primary-300/50 dark:bg-primary-600/50 rounded-full my-2" />
                         <p className="text-lg text-muted-foreground font-light tracking-wide">{word.phonetic}</p>
+                        <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px]">
+                          <span className="rounded-full bg-primary-100 px-2 py-0.5 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                            {STATUS_LABEL[word.learningStatus]}
+                          </span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                            复习 {word.reviewCount} 次
+                          </span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                            正确率 {word.accuracy}%
+                          </span>
+                        </div>
                         <button
                           className="tap-target mt-3 p-2.5 rounded-full hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                           onClick={e => { e.stopPropagation(); speak(word.word); }}
@@ -220,6 +282,9 @@ export function FlashcardsPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-2xl font-bold font-serif text-primary-700 dark:text-primary-400 truncate">{word.word}</p>
                             <p className="text-sm text-muted-foreground mt-0.5">{word.phonetic}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              下次复习: {new Date(word.nextReviewAt).toLocaleDateString()}
+                            </p>
                           </div>
                           <button
                             className="tap-target shrink-0 p-1.5 rounded-full hover:bg-muted transition-colors"
@@ -309,9 +374,14 @@ export function FlashcardsPage() {
         <Card>
           {words.length > 0 ? (
             <>
-              <p className="typo-body-sm text-muted-foreground mb-3">
-                当前词卡集合共 <span className="font-semibold text-foreground">{words.length}</span> 个单词。
+              <p className="typo-body-sm text-muted-foreground mb-2">
+                当前词卡集合共 <span className="font-semibold text-foreground">{words.length}</span> 个单词，待复习 <span className="font-semibold text-foreground">{dueReviewCount}</span> 个。
               </p>
+              <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">新词 {statusSummary.new}</span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">复习中 {statusSummary.reviewing}</span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">已掌握 {statusSummary.mastered}</span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {words.slice(0, 14).map(item => (
                   <span key={item.word} className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">

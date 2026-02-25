@@ -1,4 +1,6 @@
 // Flashcard word
+export type WordLearningStatus = 'new' | 'reviewing' | 'mastered';
+
 export interface Word {
   word: string;
   phonetic: string;
@@ -6,6 +8,10 @@ export interface Word {
   etymology: string;
   example: string;
   exampleTranslation: string;
+  learningStatus: WordLearningStatus;
+  nextReviewAt: number;
+  accuracy: number;
+  reviewCount: number;
 }
 
 // Sentence analysis

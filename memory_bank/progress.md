@@ -1,5 +1,30 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-01-flashcard-model-extension)
+
+### Completed
+- Completed `P2-F-01` (flashcard data model extension).
+- Extended flashcard `Word` model in `client/src/types/index.ts` with:
+  - `learningStatus`
+  - `nextReviewAt`
+  - `accuracy`
+  - `reviewCount`
+- Implemented compatibility-safe migration in `FlashcardsPage`:
+  - added runtime V2 model guard and normalizer
+  - legacy localStorage flashcard data is auto-upgraded on read
+  - newly提取的单词会按新模型写入默认学习字段
+- Surfaced new fields in UI:
+  - flashcard front/back now displays status / review count / accuracy / next review date
+  - history block now displays status distribution and due-review count
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-F-01` is complete and backward-compatible with old local storage payloads.
+- Next step is `P2-F-02` (flashcard extraction parameter + contract upgrade).
+
 ## 2026-02-25 (complete/p1-10-motion-and-responsive-polish)
 
 ### Completed

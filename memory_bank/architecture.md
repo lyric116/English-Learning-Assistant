@@ -1,5 +1,19 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Timed Quiz Runtime (`P2-Q-04`)
+
+### `client/src/pages/QuizPage.tsx`
+- Role: timed-quiz state machine runtime.
+- Changes:
+  - added countdown state (`remainingSeconds`) and timeout guard ref
+  - added timer tick effect for timed sessions
+  - added timeout auto-submit effect wired to shared finalize pipeline
+  - added explicit early-submit action and timeout toast feedback
+  - ensured timer reset on stage/mode transitions to prevent stale countdown leakage
+
+### Architectural Impact
+- Quiz flow now supports both untimed and timed modes under a shared completion pipeline (`finalizeQuiz`), reducing duplicated submit logic.
+
 ## Update 2026-02-25: Wrong Retry Entry Unification (`P2-Q-03`)
 
 ### `client/src/pages/QuizPage.tsx`

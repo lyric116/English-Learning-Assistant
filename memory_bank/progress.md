@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-04-timed-quiz-runtime)
+
+### Completed
+- Completed `P2-Q-04` (限时模式逻辑).
+- Quiz runtime now supports:
+  - 实时倒计时显示（限时模式）
+  - 提前交卷按钮
+  - 超时自动交卷（自动进入结果页）
+  - 超时提示 toast
+- Timer lifecycle is now managed across flows:
+  - starts on quiz start
+  - pauses/stops after submit
+  - resets when returning to select mode
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-04` is complete; timed-mode behavior is now functional end-to-end at runtime.
+- Next step is `P2-Q-05` (判分与解析展示规则统一).
+
 ## 2026-02-25 (complete/p2-q-03-wrong-retry-flow)
 
 ### Completed

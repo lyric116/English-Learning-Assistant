@@ -66,6 +66,7 @@ export function QuizPage() {
   const routeWrongMode = routeState.quizMode === 'wrong-book';
   const routeWrongType = routeState.wrongType ?? 'vocabulary';
   const autoRetryStartedRef = useRef(false);
+  const timeoutSubmittedRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('select');
   const [loading, setLoading] = useState(false);
@@ -83,6 +84,7 @@ export function QuizPage() {
   const [activeConfig, setActiveConfig] = useState<QuizGenerationConfig | null>(null);
   const [quizStartedAt, setQuizStartedAt] = useState<number | null>(null);
   const [wrongBookMode, setWrongBookMode] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [testHistory, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
   const [wrongQuestionBook, setWrongQuestionBook] = useLocalStorage<WrongQuestionRecord[]>('wrongQuestionBook', []);
@@ -155,6 +157,8 @@ export function QuizPage() {
       setQIndex(0);
       setAnswered(false);
       setQuizStartedAt(Date.now());
+      timeoutSubmittedRef.current = false;
+      setRemainingSeconds(config.timedMode ? config.timeLimitMinutes * 60 : null);
       setPhase('quiz');
       setErrorMessage('');
       toast(`已生成 ${result.length} 道${type === 'reading' ? '阅读理解' : '词汇'}题`, 'success');
@@ -205,6 +209,8 @@ export function QuizPage() {
     setAnswered(false);
     setShowReview(false);
     setQuizStartedAt(Date.now());
+    timeoutSubmittedRef.current = false;
+    setRemainingSeconds(config.timedMode ? config.timeLimitMinutes * 60 : null);
     setErrorMessage('');
     setPhase('quiz');
     toast(`已加载 ${questionsFromWrongBook.length} 道${type === 'reading' ? '阅读' : '词汇'}错题`, 'success');
@@ -226,83 +232,92 @@ export function QuizPage() {
     setAnswered(true);
   }, [answered, qIndex]);
 
-  const nextQuestion = useCallback(() => {
-    if (!answered) return;
-    if (qIndex + 1 >= questions.length) {
-      const correct = userAnswers.filter((a, i) => a === questions[i].correctIndex).length;
-      const score = Math.round((correct / questions.length) * 100);
-      const timeSpentSeconds = quizStartedAt
-        ? Math.max(1, Math.round((Date.now() - quizStartedAt) / 1000))
-        : undefined;
-      const nowIso = new Date().toISOString();
-      const wrongItems = questions
-        .map((question, index) => ({
-          question,
-          userAnswer: userAnswers[index],
-          sourceQuestionIndex: index,
-        }))
-        .filter(item => item.userAnswer !== item.question.correctIndex);
-      setTestHistory(prev => [...prev, {
-        type: testType,
-        score,
-        date: new Date().toISOString(),
-        readingTitle: currentReading?.title || '未知阅读',
-        questionCount: activeConfig?.questionCount ?? questions.length,
-        difficulty: activeConfig?.difficulty ?? difficulty,
-        timedMode: activeConfig?.timedMode ?? false,
-        timeLimitMinutes: activeConfig?.timeLimitMinutes ?? 15,
-        timeSpentSeconds,
-      }].slice(-20));
-      if (wrongItems.length > 0) {
-        setWrongQuestionBook(prev => {
-          const mapped = new Map(prev.map(item => [item.id, normalizeWrongQuestionRecord(item)]));
-          wrongItems.forEach(item => {
-            const id = createWrongQuestionId(testType, item.question.question);
-            const existing = mapped.get(id);
-            if (existing) {
-              mapped.set(id, {
-                ...existing,
-                options: item.question.options,
-                correctIndex: item.question.correctIndex,
-                explanation: item.question.explanation,
-                userAnswer: item.userAnswer,
-                sourceQuestionIndex: item.sourceQuestionIndex,
-                readingTitle: currentReading?.title || existing.readingTitle,
-                difficulty: activeConfig?.difficulty ?? existing.difficulty,
-                repeatCount: existing.repeatCount + 1,
-                wrongReason: existing.wrongReason || inferWrongReason(testType),
-                lastPracticedAt: nowIso,
-              });
-              return;
-            }
+  const finalizeQuiz = useCallback((reason: 'complete' | 'timeout' = 'complete') => {
+    if (phase !== 'quiz' || questions.length === 0) return;
+    const correct = userAnswers.filter((a, i) => a === questions[i].correctIndex).length;
+    const score = Math.round((correct / questions.length) * 100);
+    const timeSpentSeconds = quizStartedAt
+      ? Math.max(1, Math.round((Date.now() - quizStartedAt) / 1000))
+      : undefined;
+    const nowIso = new Date().toISOString();
+    const wrongItems = questions
+      .map((question, index) => ({
+        question,
+        userAnswer: userAnswers[index],
+        sourceQuestionIndex: index,
+      }))
+      .filter(item => item.userAnswer !== item.question.correctIndex);
+    setTestHistory(prev => [...prev, {
+      type: testType,
+      score,
+      date: new Date().toISOString(),
+      readingTitle: currentReading?.title || '未知阅读',
+      questionCount: activeConfig?.questionCount ?? questions.length,
+      difficulty: activeConfig?.difficulty ?? difficulty,
+      timedMode: activeConfig?.timedMode ?? false,
+      timeLimitMinutes: activeConfig?.timeLimitMinutes ?? 15,
+      timeSpentSeconds,
+    }].slice(-20));
+    if (wrongItems.length > 0) {
+      setWrongQuestionBook(prev => {
+        const mapped = new Map(prev.map(item => [item.id, normalizeWrongQuestionRecord(item)]));
+        wrongItems.forEach(item => {
+          const id = createWrongQuestionId(testType, item.question.question);
+          const existing = mapped.get(id);
+          if (existing) {
             mapped.set(id, {
-              id,
-              type: testType,
-              question: item.question.question,
+              ...existing,
               options: item.question.options,
               correctIndex: item.question.correctIndex,
               explanation: item.question.explanation,
               userAnswer: item.userAnswer,
-              wrongReason: inferWrongReason(testType),
-              readingTitle: currentReading?.title || '未知阅读',
               sourceQuestionIndex: item.sourceQuestionIndex,
-              difficulty: activeConfig?.difficulty ?? difficulty,
-              repeatCount: 1,
-              firstWrongAt: nowIso,
+              readingTitle: currentReading?.title || existing.readingTitle,
+              difficulty: activeConfig?.difficulty ?? existing.difficulty,
+              repeatCount: existing.repeatCount + 1,
+              wrongReason: existing.wrongReason || inferWrongReason(testType),
               lastPracticedAt: nowIso,
             });
+            return;
+          }
+          mapped.set(id, {
+            id,
+            type: testType,
+            question: item.question.question,
+            options: item.question.options,
+            correctIndex: item.question.correctIndex,
+            explanation: item.question.explanation,
+            userAnswer: item.userAnswer,
+            wrongReason: inferWrongReason(testType),
+            readingTitle: currentReading?.title || '未知阅读',
+            sourceQuestionIndex: item.sourceQuestionIndex,
+            difficulty: activeConfig?.difficulty ?? difficulty,
+            repeatCount: 1,
+            firstWrongAt: nowIso,
+            lastPracticedAt: nowIso,
           });
-          return Array.from(mapped.values()).sort((a, b) => (
-            Date.parse(b.lastPracticedAt) - Date.parse(a.lastPracticedAt)
-          ));
         });
-      }
-      setPhase('result');
+        return Array.from(mapped.values()).sort((a, b) => (
+          Date.parse(b.lastPracticedAt) - Date.parse(a.lastPracticedAt)
+        ));
+      });
+    }
+    setRemainingSeconds(null);
+    setPhase('result');
+    if (reason === 'timeout') {
+      toast('已超时，系统已自动交卷', 'warning');
+    }
+  }, [activeConfig, currentReading?.title, difficulty, phase, questions, quizStartedAt, setTestHistory, setWrongQuestionBook, testType, toast, userAnswers]);
+
+  const nextQuestion = useCallback(() => {
+    if (!answered) return;
+    if (qIndex + 1 >= questions.length) {
+      finalizeQuiz('complete');
     } else {
       setQIndex(i => i + 1);
       setAnswered(false);
     }
-  }, [activeConfig, answered, currentReading, difficulty, qIndex, questions, quizStartedAt, setTestHistory, setWrongQuestionBook, testType, userAnswers]);
+  }, [answered, finalizeQuiz, qIndex, questions.length]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -321,6 +336,21 @@ export function QuizPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [phase, answered, qIndex, questions, selectOption, nextQuestion]);
 
+  useEffect(() => {
+    if (phase !== 'quiz' || !activeConfig?.timedMode || remainingSeconds === null || remainingSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setRemainingSeconds(prev => (prev === null ? null : Math.max(0, prev - 1)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeConfig?.timedMode, phase, remainingSeconds]);
+
+  useEffect(() => {
+    if (phase !== 'quiz' || !activeConfig?.timedMode || remainingSeconds === null || remainingSeconds > 0) return;
+    if (timeoutSubmittedRef.current) return;
+    timeoutSubmittedRef.current = true;
+    finalizeQuiz('timeout');
+  }, [activeConfig?.timedMode, finalizeQuiz, phase, remainingSeconds]);
+
   const correctCount = userAnswers.filter((a, i) => a === questions[i]?.correctIndex).length;
   const wrongCount = questions.length - correctCount;
   const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
@@ -334,6 +364,10 @@ export function QuizPage() {
   const wrongBookTotal = wrongQuestionBook.length;
   const highRepeatWrongCount = wrongQuestionBook.filter(item => item.repeatCount >= 2).length;
   const latestWrong = wrongQuestionBook[0] ?? null;
+  const timerMinutes = remainingSeconds === null ? 0 : Math.floor(remainingSeconds / 60);
+  const timerSeconds = remainingSeconds === null ? 0 : remainingSeconds % 60;
+  const timerText = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
+  const timerUrgent = remainingSeconds !== null && remainingSeconds <= 60;
 
   const scoreColor = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-yellow-500' : 'text-red-500';
   const scoreEmoji = score >= 90 ? '🎉' : score >= 70 ? '👍' : score >= 50 ? '💪' : '📚';
@@ -531,6 +565,11 @@ export function QuizPage() {
                   }
                 </span>
               </div>
+              {activeConfig?.timedMode && (
+                <p className={cn('mb-1.5 text-xs font-medium', timerUrgent ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground')}>
+                  剩余时间 {timerText}
+                </p>
+              )}
               {activeConfig && (
                 <p className="mb-1.5 text-xs text-muted-foreground">
                   {wrongBookMode ? '错题重练 · ' : ''}
@@ -594,10 +633,15 @@ export function QuizPage() {
               <p className="text-xs text-muted-foreground">
                 按 1-4 选择答案，Enter 下一题
               </p>
-              <Button onClick={nextQuestion} disabled={!answered}>
-                {qIndex + 1 >= questions.length ? '查看结果' : '下一题'}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={() => finalizeQuiz('complete')}>
+                  提前交卷
+                </Button>
+                <Button onClick={nextQuestion} disabled={!answered}>
+                  {qIndex + 1 >= questions.length ? '查看结果' : '下一题'}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -641,7 +685,17 @@ export function QuizPage() {
                     {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setWrongBookMode(false); }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setPhase('select');
+                    setQuestions([]);
+                    setShowReview(false);
+                    setWrongBookMode(false);
+                    setRemainingSeconds(null);
+                    timeoutSubmittedRef.current = false;
+                  }}
+                >
                   <RotateCcw className="h-4 w-4 mr-1.5" /> 重新选择
                 </Button>
                 <Button onClick={() => navigate('/achievements')}>
@@ -750,7 +804,15 @@ export function QuizPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setAnswered(false); setWrongBookMode(false); }}
+                onClick={() => {
+                  setPhase('select');
+                  setQuestions([]);
+                  setShowReview(false);
+                  setAnswered(false);
+                  setWrongBookMode(false);
+                  setRemainingSeconds(null);
+                  timeoutSubmittedRef.current = false;
+                }}
               >
                 返回选题
               </Button>

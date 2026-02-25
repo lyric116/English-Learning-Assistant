@@ -9,6 +9,7 @@ import { readingRouter } from './routes/reading';
 import { quizRouter } from './routes/quiz';
 import { reportRouter } from './routes/report';
 import { testConnection } from './services/ai-service';
+import { validateAiTestPayload } from './utils/request-validator';
 
 const app = express();
 
@@ -43,7 +44,7 @@ app.get('/api/v1', (_req, res) => {
 // AI connection test
 app.post('/api/v1/ai/test', async (req, res, next) => {
   try {
-    const { aiConfig } = req.body;
+    const { aiConfig } = validateAiTestPayload(req.body);
     const result = await testConnection(aiConfig);
     res.json(result);
   } catch (err) {

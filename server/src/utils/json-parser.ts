@@ -24,7 +24,11 @@ export function parseJsonResponse<T>(content: string): T {
 
     if (jsonStart !== -1 && jsonEnd > jsonStart) {
       const extracted = cleaned.substring(jsonStart, jsonEnd + 1);
-      return JSON.parse(extracted);
+      try {
+        return JSON.parse(extracted);
+      } catch {
+        throw new Error('无法解析 AI 返回的 JSON 数据');
+      }
     }
 
     throw new Error('无法解析 AI 返回的 JSON 数据');

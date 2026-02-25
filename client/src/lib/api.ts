@@ -4,7 +4,7 @@ import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage';
 import { getAnonymousSessionId } from './session';
 
 const API_BASE = '/api/v1';
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 95_000;
 
 function isAiRequest(url: string, method: string): boolean {
   return method === 'POST' && url !== '/health';

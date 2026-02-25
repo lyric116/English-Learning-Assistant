@@ -1,5 +1,124 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Functional Baseline Closure (`P0-04`)
+
+### `code/functional_baseline.md`
+- Upgraded from partial baseline notes to full cross-module evidence log.
+- File now acts as the Phase 0 verification artifact for:
+  - flashcards
+  - sentence analysis
+  - reading generation
+  - quiz generation (reading + vocabulary)
+  - achievements report generation
+- Each module includes success-path API evidence and observed latency to support future regression comparison.
+
+## Update 2026-02-25: Timeout & Upstream JSON Parse Bugfix
+
+### `server/src/services/ai-service.ts`
+- Added `safeReadJson()` abstraction to decouple transport response reading from strict JSON parsing.
+- File responsibilities were extended with:
+  - safe fallback when upstream returns non-JSON payload (HTML/text)
+  - normalized error extraction for non-2xx responses
+  - explicit non-JSON success-response guard (`AI 上游返回非 JSON 内容...`)
+- Result: prevents raw `Unexpected token '<'` propagation and keeps error surface domain-specific.
+
+### `server/src/utils/json-parser.ts`
+- JSON boundary fallback now catches secondary parse failures and returns one stable business error.
+- Result: avoids leaking raw parser token errors from malformed model output.
+
+### `server/src/config.ts`
+- Default AI request timeout raised from `45s` to `90s`.
+- Rationale: reduce false timeout failures on heavier prompts (flashcards/sentence).
+
+### `client/src/lib/api.ts`
+- Client request timeout raised to `95s` to align with backend timeout and avoid client-abort-before-server-return races.
+
+### `server/src/utils/request-validator.ts`
+- Added tighter payload-size guardrails for timeout-prone modules:
+  - flashcards text: max `8000`
+  - sentence: max `1000`
+- Result: pathological long inputs fail fast with readable 400 errors instead of long-running timeouts.
+
+### `server/src/middleware/error-handler.ts`
+- Validation-like message patterns (`不能为空` / `必须是` / `不支持`) now consistently map to 400.
+
+## Update 2026-02-25: Phase-0 Planning Artifacts & Doc Alignment
+
+### `code/target_users.md`
+- New product-definition artifact for `P0-06`.
+- Responsibilities:
+  - define 3 concrete personas (exam / workplace / long-term learner)
+  - define usage frequency assumptions per persona
+  - define measurable success metrics for MVP tracking
+
+### `code/brand_guidelines.md`
+- New brand governance artifact for `P0-07`.
+- Responsibilities:
+  - standardize product positioning, tone, and CTA language
+  - define color/visual baseline for upcoming UI refactors
+  - constrain unsafe/misleading copy patterns
+
+### `code/functional_baseline.md`
+- New baseline runbook artifact for `P0-04/P0-05`.
+- Responsibilities:
+  - capture current module-by-module baseline status
+  - preserve API smoke evidence and known environment blockers
+  - provide an actionable handoff checklist for completing pending baseline steps
+
+### `CLAUDE.md`
+- Rewritten from obsolete vanilla-frontend instructions to current full-stack architecture.
+- Responsibilities:
+  - document actual runtime and build model (`dev:server` + `dev:client`)
+  - map current frontend/backend/service boundaries
+  - keep assistant contributors aligned with active technical stack
+
+## Update 2026-02-25: Request Validation Layer (`P4-01`)
+
+### `server/src/utils/request-validator.ts`
+- New centralized validation boundary for HTTP request bodies.
+- Responsibilities:
+  - define `ValidationError` (client input fault)
+  - parse and normalize common fields (`string/int/enum/array/object`)
+  - validate and normalize optional/required `aiConfig`
+  - export route-level validators with explicit contracts
+- Why it matters:
+  - moves input integrity checks out of route handlers
+  - prevents malformed payloads from entering AI service calls
+  - keeps validation rules reusable and testable
+
+### `server/src/routes/flashcards.ts`
+- Role update: now only orchestrates
+  1) validate request via `validateFlashcardsExtractPayload`
+  2) call `extractWords`
+  3) return result / forward error
+- No route-local business validation remains.
+
+### `server/src/routes/sentence.ts`
+- Uses `validateSentenceAnalyzePayload` before `analyzeSentence`.
+- Route role is now pure transport + orchestration.
+
+### `server/src/routes/reading.ts`
+- Uses `validateReadingGeneratePayload` before `generateReadingContent`.
+- Standardizes `language` and `text` contract before service layer.
+
+### `server/src/routes/quiz.ts`
+- Uses:
+  - `validateReadingQuestionsPayload`
+  - `validateVocabularyQuestionsPayload`
+- Enforces bounds for `questionCount` and array constraints for vocabulary input.
+
+### `server/src/routes/report.ts`
+- Uses `validateReportGeneratePayload`.
+- Ensures `reportType` and `learningData` shape are valid before AI report generation.
+
+### `server/src/index.ts`
+- `POST /api/v1/ai/test` now uses `validateAiTestPayload`.
+- Keeps AI connectivity check behavior consistent with other endpoints' validation discipline.
+
+### `server/src/middleware/error-handler.ts`
+- Now recognizes `ValidationError` explicitly and returns HTTP 400.
+- Reduces status inference ambiguity for input errors.
+
 ## Frontend
 
 ### `client/src/lib/base-url.ts`

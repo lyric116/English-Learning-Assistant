@@ -23,6 +23,12 @@ interface ErrorBody {
   error?: { message?: string };
 }
 
+interface SafeJsonResult<T = unknown> {
+  ok: boolean;
+  data?: T;
+  rawText?: string;
+}
+
 function isPrivateOrLocalhost(hostname: string): boolean {
   const host = hostname.toLowerCase();
 
@@ -61,6 +67,17 @@ function getErrorMessageFromBody(body: unknown): string | undefined {
 
   const maybeMessage = (body as ErrorBody).error?.message;
   return typeof maybeMessage === 'string' ? maybeMessage : undefined;
+}
+
+async function safeReadJson<T = unknown>(res: Response): Promise<SafeJsonResult<T>> {
+  const text = await res.text();
+  if (!text) return { ok: false, rawText: '' };
+
+  try {
+    return { ok: true, data: JSON.parse(text) as T };
+  } catch {
+    return { ok: false, rawText: text };
+  }
 }
 
 function validateBaseUrl(baseUrl: string): string {
@@ -160,12 +177,18 @@ async function sendRequest(prompt: string, options: { temperature?: number; maxT
   });
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => undefined);
-    const upstreamMessage = getErrorMessageFromBody(errBody) || res.statusText || '未知上游错误';
+    const errBody = await safeReadJson<ErrorBody>(res);
+    const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+    const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
     throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
   }
 
-  const data = (await res.json()) as ChatCompletionResponse;
+  const dataResult = await safeReadJson<ChatCompletionResponse>(res);
+  if (!dataResult.ok || !dataResult.data) {
+    throw new Error('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
+  }
+
+  const data = dataResult.data;
   const content = data.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error('AI 返回内容为空，请稍后重试');
@@ -223,11 +246,15 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
   });
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => undefined);
-    const upstreamMessage = getErrorMessageFromBody(errBody) || res.statusText || '未知上游错误';
+    const errBody = await safeReadJson<ErrorBody>(res);
+    const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+    const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
     throw new Error(`连接失败: ${sanitizeErrorText(upstreamMessage)}`);
   }
 
-  await res.json();
+  const okBody = await safeReadJson(res);
+  if (!okBody.ok) {
+    throw new Error('连接失败: 上游返回非 JSON 内容');
+  }
   return { success: true, model: aiConfig.model };
 }

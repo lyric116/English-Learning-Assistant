@@ -9,7 +9,7 @@ export const config = {
     max: 20,
   },
   ai: {
-    requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '45000', 10),
+    requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '90000', 10),
     allowPrivateHosts: process.env.ALLOW_PRIVATE_AI_HOSTS === '1',
   },
 };

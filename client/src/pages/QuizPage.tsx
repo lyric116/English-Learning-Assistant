@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -57,7 +57,15 @@ export function QuizPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const routeReading = (location.state as { currentReading?: ReadingContent })?.currentReading ?? null;
+  const routeState = (location.state as {
+    currentReading?: ReadingContent;
+    quizMode?: 'normal' | 'wrong-book';
+    wrongType?: 'reading' | 'vocabulary';
+  }) ?? {};
+  const routeReading = routeState.currentReading ?? null;
+  const routeWrongMode = routeState.quizMode === 'wrong-book';
+  const routeWrongType = routeState.wrongType ?? 'vocabulary';
+  const autoRetryStartedRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('select');
   const [loading, setLoading] = useState(false);
@@ -74,6 +82,7 @@ export function QuizPage() {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
   const [activeConfig, setActiveConfig] = useState<QuizGenerationConfig | null>(null);
   const [quizStartedAt, setQuizStartedAt] = useState<number | null>(null);
+  const [wrongBookMode, setWrongBookMode] = useState(false);
   const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [testHistory, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
   const [wrongQuestionBook, setWrongQuestionBook] = useLocalStorage<WrongQuestionRecord[]>('wrongQuestionBook', []);
@@ -113,6 +122,7 @@ export function QuizPage() {
     }
     setErrorMessage('');
     setTestType(type);
+    setWrongBookMode(false);
     setLoading(true);
     try {
       const config: QuizGenerationConfig = {
@@ -156,6 +166,55 @@ export function QuizPage() {
       setLoading(false);
     }
   };
+
+  const startWrongBookQuiz = useCallback((type: 'reading' | 'vocabulary') => {
+    const source = wrongQuestionBook
+      .filter(item => item.type === type)
+      .sort((a, b) => {
+        if (b.repeatCount !== a.repeatCount) return b.repeatCount - a.repeatCount;
+        return Date.parse(a.lastPracticedAt) - Date.parse(b.lastPracticedAt);
+      });
+
+    if (source.length === 0) {
+      toast(type === 'reading' ? '暂无阅读错题可重练' : '暂无词汇错题可重练', 'warning');
+      return;
+    }
+
+    const selected = source.slice(0, questionCount);
+    const questionsFromWrongBook = selected.map(item => ({
+      question: item.question,
+      options: item.options,
+      correctIndex: item.correctIndex,
+      explanation: item.explanation,
+    }));
+
+    const config: QuizGenerationConfig = {
+      testType: type,
+      questionCount: questionsFromWrongBook.length,
+      difficulty,
+      timedMode,
+      timeLimitMinutes,
+    };
+
+    setTestType(type);
+    setWrongBookMode(true);
+    setActiveConfig(config);
+    setQuestions(questionsFromWrongBook);
+    setUserAnswers(new Array(questionsFromWrongBook.length).fill(null));
+    setQIndex(0);
+    setAnswered(false);
+    setShowReview(false);
+    setQuizStartedAt(Date.now());
+    setErrorMessage('');
+    setPhase('quiz');
+    toast(`已加载 ${questionsFromWrongBook.length} 道${type === 'reading' ? '阅读' : '词汇'}错题`, 'success');
+  }, [difficulty, questionCount, timeLimitMinutes, timedMode, toast, wrongQuestionBook]);
+
+  useEffect(() => {
+    if (!routeWrongMode || autoRetryStartedRef.current || phase !== 'select' || loading) return;
+    autoRetryStartedRef.current = true;
+    startWrongBookQuiz(routeWrongType);
+  }, [loading, phase, routeWrongMode, routeWrongType, startWrongBookQuiz]);
 
   const selectOption = useCallback((optionIdx: number) => {
     if (answered) return;
@@ -270,6 +329,8 @@ export function QuizPage() {
   const wrongQuestions = questions
     .map((q, i) => ({ ...q, userAnswer: userAnswers[i], index: i }))
     .filter(q => q.userAnswer !== q.correctIndex);
+  const readingWrongCount = wrongQuestionBook.filter(item => item.type === 'reading').length;
+  const vocabularyWrongCount = wrongQuestionBook.filter(item => item.type === 'vocabulary').length;
   const wrongBookTotal = wrongQuestionBook.length;
   const highRepeatWrongCount = wrongQuestionBook.filter(item => item.repeatCount >= 2).length;
   const latestWrong = wrongQuestionBook[0] ?? null;
@@ -376,6 +437,48 @@ export function QuizPage() {
                 </p>
               </Card>
               </div>
+              {wrongBookTotal > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card
+                    className={cn(
+                      'cursor-pointer group transition-all',
+                      readingWrongCount > 0
+                        ? 'hover:shadow-xl hover:border-amber-300 dark:hover:border-amber-700'
+                        : 'opacity-60 cursor-not-allowed',
+                    )}
+                    onClick={() => readingWrongCount > 0 && startWrongBookQuiz('reading')}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                      <h2 className="typo-h3">重练阅读错题</h2>
+                    </div>
+                    <p className="text-muted-foreground typo-body-sm">
+                      错题库可用 {readingWrongCount} 题，按重复次数优先抽取。
+                    </p>
+                  </Card>
+                  <Card
+                    className={cn(
+                      'cursor-pointer group transition-all',
+                      vocabularyWrongCount > 0
+                        ? 'hover:shadow-xl hover:border-amber-300 dark:hover:border-amber-700'
+                        : 'opacity-60 cursor-not-allowed',
+                    )}
+                    onClick={() => vocabularyWrongCount > 0 && startWrongBookQuiz('vocabulary')}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                      <h2 className="typo-h3">重练词汇错题</h2>
+                    </div>
+                    <p className="text-muted-foreground typo-body-sm">
+                      错题库可用 {vocabularyWrongCount} 题，按重复次数优先抽取。
+                    </p>
+                  </Card>
+                </div>
+              )}
               {currentReading.title && (
                 <p className="text-center text-sm text-muted-foreground">
                   当前阅读：<span className="font-medium text-foreground">{currentReading.title}</span>
@@ -398,6 +501,7 @@ export function QuizPage() {
               {activeConfig ? (
                 <>
                   {' '}· 配置：<span className="font-semibold text-foreground">
+                    {wrongBookMode ? '错题重练 / ' : ''}
                     {activeConfig.questionCount}题 / {QUIZ_DIFFICULTY_LABELS[activeConfig.difficulty]} / {activeConfig.timedMode ? `${activeConfig.timeLimitMinutes}分钟限时` : '非限时'}
                   </span>
                 </>
@@ -429,6 +533,7 @@ export function QuizPage() {
               </div>
               {activeConfig && (
                 <p className="mb-1.5 text-xs text-muted-foreground">
+                  {wrongBookMode ? '错题重练 · ' : ''}
                   难度 {QUIZ_DIFFICULTY_LABELS[activeConfig.difficulty]} · {activeConfig.timedMode ? `${activeConfig.timeLimitMinutes} 分钟限时` : '非限时'}
                 </p>
               )}
@@ -536,7 +641,7 @@ export function QuizPage() {
                     {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); }}>
+                <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setWrongBookMode(false); }}>
                   <RotateCcw className="h-4 w-4 mr-1.5" /> 重新选择
                 </Button>
                 <Button onClick={() => navigate('/achievements')}>
@@ -631,11 +736,21 @@ export function QuizPage() {
             <Button variant="secondary" size="sm" onClick={() => navigate('/reading')}>
               前往双语阅读
             </Button>
+            {readingWrongCount > 0 && phase === 'select' && (
+              <Button variant="secondary" size="sm" onClick={() => startWrongBookQuiz('reading')}>
+                重练阅读错题
+              </Button>
+            )}
+            {vocabularyWrongCount > 0 && phase === 'select' && (
+              <Button variant="secondary" size="sm" onClick={() => startWrongBookQuiz('vocabulary')}>
+                重练词汇错题
+              </Button>
+            )}
             {phase !== 'select' && (
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setAnswered(false); }}
+                onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setAnswered(false); setWrongBookMode(false); }}
               >
                 返回选题
               </Button>

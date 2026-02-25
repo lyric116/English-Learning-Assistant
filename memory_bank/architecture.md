@@ -1,5 +1,28 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Wrong Retry Entry Unification (`P2-Q-03`)
+
+### `client/src/pages/QuizPage.tsx`
+- Role: wrong-question retry executor.
+- Changes:
+  - added `startWrongBookQuiz(type)` pipeline:
+    - source: `wrongQuestionBook`
+    - filter: by quiz type (`reading` / `vocabulary`)
+    - sort: `repeatCount` desc + `lastPracticedAt` asc
+    - truncate: current `questionCount`
+  - supports route-state auto-start (`quizMode=wrong-book`, `wrongType`)
+  - select/action zones now expose explicit wrong-retry entries
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: cross-module retry entry source.
+- Changes:
+  - reads wrong-book stats from local storage
+  - adds retry actions for reading/vocabulary wrong sets
+  - navigates to quiz with route-state trigger
+
+### Architectural Impact
+- Wrong-question retry path is now centralized in quiz-page selection logic; multiple entry pages only trigger mode/type, avoiding duplicated filtering logic.
+
 ## Update 2026-02-25: Wrong Question Book Model (`P2-Q-02`)
 
 ### `client/src/types/index.ts`

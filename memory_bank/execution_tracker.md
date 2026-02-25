@@ -41,7 +41,7 @@
 | 35 | P2-R-06 | completed | Reading regression checklist executed (`code/reading_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
 | 36 | P2-Q-01 | completed | Quiz now supports configurable generation params (`type/difficulty/questionCount/timedMode/timeLimitMinutes`) across UI/API/validator/prompt contract, with test history carrying config snapshot. |
 | 37 | P2-Q-02 | completed | Introduced wrong-question-book model (`wrongQuestionBook`) with repeat tracking, wrong-reason metadata, first/last practice timestamps, and quiz-finish write-back pipeline. |
-| 38 | P2-Q-03 | pending | Not started. |
+| 38 | P2-Q-03 | completed | Added wrong-question retry flow in both Quiz and Achievements entries; both paths use the same `wrongQuestionBook` filter/sort strategy and only load wrong items by type. |
 | 39 | P2-Q-04 | pending | Not started. |
 | 40 | P2-Q-05 | pending | Not started. |
 | 41 | P2-Q-06 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-Q-03`.
+- First not-yet-completed step: `P2-Q-04`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -14,7 +15,7 @@ import {
   ThumbsUp, AlertTriangle, Lightbulb, Share2,
   X, BarChart3,
 } from 'lucide-react';
-import type { FlashcardSessionSummary, LearningReport, Word, ReadingContent, TestResult } from '@/types';
+import type { FlashcardSessionSummary, LearningReport, Word, ReadingContent, TestResult, WrongQuestionRecord } from '@/types';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
 const reportTypes = [
@@ -30,6 +31,7 @@ function formatDateTime(value: string): string {
 }
 
 export function AchievementsPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [selectedType, setSelectedType] = useState('weekly');
   const [loading, setLoading] = useState(false);
@@ -40,7 +42,11 @@ export function AchievementsPage() {
   const [flashcardSessionSummary] = useLocalStorage<FlashcardSessionSummary | null>('flashcardSessionSummary', null);
   const [readingHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
   const [testHistory] = useLocalStorage<TestResult[]>('testHistory', []);
+  const [wrongQuestionBook] = useLocalStorage<WrongQuestionRecord[]>('wrongQuestionBook', []);
   const [reportHistory, setReportHistory] = useLocalStorage<(LearningReport & { timestamp?: number })[]>('reportHistory', []);
+
+  const readingWrongCount = wrongQuestionBook.filter(item => item.type === 'reading').length;
+  const vocabularyWrongCount = wrongQuestionBook.filter(item => item.type === 'vocabulary').length;
 
   const hasData = flashcards.length > 0
     || readingHistory.length > 0
@@ -97,6 +103,15 @@ export function AchievementsPage() {
     void timestamp;
     setReport(reportData);
     toast('已加载历史报告', 'info');
+  };
+
+  const retryWrongQuestions = (type: 'reading' | 'vocabulary') => {
+    const total = type === 'reading' ? readingWrongCount : vocabularyWrongCount;
+    if (total === 0) {
+      toast(type === 'reading' ? '暂无阅读错题可重练' : '暂无词汇错题可重练', 'warning');
+      return;
+    }
+    navigate('/quiz', { state: { quizMode: 'wrong-book', wrongType: type } });
   };
 
   return (
@@ -317,6 +332,29 @@ export function AchievementsPage() {
           )}
         </Card>
 
+        <Card className="mb-4">
+          <div className="analysis-card-header">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <h3 className="font-bold">错题重练</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+            <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+              阅读错题 <span className="font-semibold text-foreground">{readingWrongCount}</span>
+            </span>
+            <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+              词汇错题 <span className="font-semibold text-foreground">{vocabularyWrongCount}</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => retryWrongQuestions('reading')} disabled={readingWrongCount === 0}>
+              重练阅读错题
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => retryWrongQuestions('vocabulary')} disabled={vocabularyWrongCount === 0}>
+              重练词汇错题
+            </Button>
+          </div>
+        </Card>
+
         <Card>
           {reportHistory.length > 0 ? (
             <div className="space-y-2">
@@ -348,6 +386,12 @@ export function AchievementsPage() {
             <Button size="sm" onClick={generateReport} disabled={loading || !hasData}>
               <BarChart3 className="h-4 w-4 mr-1.5" />
               重新生成
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => retryWrongQuestions('reading')} disabled={readingWrongCount === 0}>
+              重练阅读错题
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => retryWrongQuestions('vocabulary')} disabled={vocabularyWrongCount === 0}>
+              重练词汇错题
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setShowShare(true)} disabled={!report}>
               <Share2 className="h-4 w-4 mr-1.5" />

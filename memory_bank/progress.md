@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-03-wrong-retry-flow)
+
+### Completed
+- Completed `P2-Q-03` (错题重练流程).
+- Quiz page:
+  - added错题重练入口（阅读/词汇）并支持按错题本加载题集
+  - 重练题集来源统一为 `wrongQuestionBook`，按 `repeatCount` 优先并限量到当前题量配置
+  - 支持路由状态自动进入错题重练（用于跨页面入口）
+- Achievements page:
+  - 新增错题统计与重练按钮（阅读错题/词汇错题）
+  - 重练入口通过路由状态跳转到 Quiz 并触发同一加载逻辑
+- Consistency guarantee:
+  - 两个入口都复用同一套“按类型过滤 + 同排序 + 同题量截断”规则，保证题目集合一致且仅含错题。
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-03` is complete; wrong-question retry is now reachable from Quiz and Achievements with consistent data selection.
+- Next step is `P2-Q-04` (限时模式逻辑：计时、超时交卷、提示).
+
 ## 2026-02-25 (complete/p2-q-02-wrong-question-model)
 
 ### Completed

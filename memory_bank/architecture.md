@@ -1,5 +1,31 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Wrong Question Book Model (`P2-Q-02`)
+
+### `client/src/types/index.ts`
+- Role: quiz persistence contract definition.
+- Changes:
+  - added `WrongQuestionRecord` domain model with:
+    - identity (`id`)
+    - repeat statistics (`repeatCount`)
+    - temporal markers (`firstWrongAt`, `lastPracticedAt`)
+    - wrong-reason + answer snapshot fields
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz-to-wrongbook write pipeline.
+- Changes:
+  - added `wrongQuestionBook` localStorage state
+  - quiz completion now extracts wrong answers and writes/merges into wrong book
+  - dedup strategy keyed by `type + question`
+  - repeated misses increment repeat counter and refresh `lastPracticedAt`
+  - added runtime normalization for legacy records missing new fields
+  - history zone now surfaces wrong-book summary signals
+
+### Architectural Impact
+- Quiz data now splits into two layers:
+  - `testHistory` for attempt-level summaries
+  - `wrongQuestionBook` for question-level remediation tracking.
+
 ## Update 2026-02-25: Quiz Parameter Contract Extension (`P2-Q-01`)
 
 ### `client/src/pages/QuizPage.tsx`

@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-02-wrong-question-model)
+
+### Completed
+- Completed `P2-Q-02` (错题本数据模型与记录机制).
+- Added wrong-question data model:
+  - `WrongQuestionRecord` with repeat count, wrong reason, first/last practice time, difficulty snapshot
+- Quiz result write-back now records wrong questions into localStorage `wrongQuestionBook`:
+  - supports dedup by question identity
+  - repeated wrong answers accumulate `repeatCount`
+  - updates latest practice time and latest user answer
+- Added legacy-safe normalization for old wrong-book records on read.
+- Quiz history section now displays wrong-book summary (`累计错题 / 重复错题 / 最近错题`).
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-02` is complete; wrong-question persistence now exists as an independent local model.
+- Next step is `P2-Q-03` (错题重练流程：测验页 + 成就页入口).
+
 ## 2026-02-25 (complete/p2-q-01-quiz-parameter-extension)
 
 ### Completed

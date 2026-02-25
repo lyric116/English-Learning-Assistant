@@ -122,6 +122,23 @@ export interface QuizQuestion {
   explanation: string;
 }
 
+export interface WrongQuestionRecord {
+  id: string;
+  type: 'reading' | 'vocabulary';
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  userAnswer: number | null;
+  wrongReason: string;
+  readingTitle: string;
+  sourceQuestionIndex: number;
+  difficulty: QuizDifficulty;
+  repeatCount: number;
+  firstWrongAt: string;
+  lastPracticedAt: string;
+}
+
 export interface TestResult {
   type: 'reading' | 'vocabulary';
   score: number;

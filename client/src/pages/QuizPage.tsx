@@ -15,7 +15,14 @@ import {
   BookOpen, Type, ListChecks, RotateCcw,
   Trophy, ChevronRight, AlertTriangle, CheckCircle2, XCircle,
 } from 'lucide-react';
-import type { QuizDifficulty, QuizGenerationConfig, QuizQuestion, ReadingContent, TestResult } from '@/types';
+import type {
+  QuizDifficulty,
+  QuizGenerationConfig,
+  QuizQuestion,
+  ReadingContent,
+  TestResult,
+  WrongQuestionRecord,
+} from '@/types';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
 type Phase = 'select' | 'quiz' | 'result';
@@ -25,6 +32,25 @@ const QUIZ_DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
   hard: '高阶',
 };
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20];
+
+function createWrongQuestionId(type: 'reading' | 'vocabulary', question: string): string {
+  return `${type}:${question.trim().toLowerCase()}`;
+}
+
+function inferWrongReason(type: 'reading' | 'vocabulary'): string {
+  return type === 'reading' ? '阅读信息定位偏差' : '词义/用法辨析错误';
+}
+
+function normalizeWrongQuestionRecord(record: WrongQuestionRecord): WrongQuestionRecord {
+  return {
+    ...record,
+    repeatCount: typeof record.repeatCount === 'number' && record.repeatCount > 0 ? record.repeatCount : 1,
+    firstWrongAt: record.firstWrongAt || record.lastPracticedAt || new Date().toISOString(),
+    lastPracticedAt: record.lastPracticedAt || record.firstWrongAt || new Date().toISOString(),
+    difficulty: record.difficulty || 'medium',
+    wrongReason: record.wrongReason || inferWrongReason(record.type),
+  };
+}
 
 export function QuizPage() {
   const quizContextKey = 'quizCurrentReading';
@@ -50,6 +76,7 @@ export function QuizPage() {
   const [quizStartedAt, setQuizStartedAt] = useState<number | null>(null);
   const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [testHistory, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
+  const [wrongQuestionBook, setWrongQuestionBook] = useLocalStorage<WrongQuestionRecord[]>('wrongQuestionBook', []);
   const currentReading = routeReading ?? storedReading;
   const restoredFromStorage = !routeReading && !!storedReading;
 
@@ -58,6 +85,17 @@ export function QuizPage() {
       setStoredReading(routeReading);
     }
   }, [routeReading, setStoredReading]);
+
+  useEffect(() => {
+    const hasLegacy = wrongQuestionBook.some(item => (
+      typeof item.repeatCount !== 'number'
+      || !item.firstWrongAt
+      || !item.lastPracticedAt
+      || !item.wrongReason
+    ));
+    if (!hasLegacy) return;
+    setWrongQuestionBook(prev => prev.map(item => normalizeWrongQuestionRecord(item)));
+  }, [setWrongQuestionBook, wrongQuestionBook]);
 
   const startQuiz = async (type: 'reading' | 'vocabulary') => {
     if (!currentReading) {
@@ -137,6 +175,14 @@ export function QuizPage() {
       const timeSpentSeconds = quizStartedAt
         ? Math.max(1, Math.round((Date.now() - quizStartedAt) / 1000))
         : undefined;
+      const nowIso = new Date().toISOString();
+      const wrongItems = questions
+        .map((question, index) => ({
+          question,
+          userAnswer: userAnswers[index],
+          sourceQuestionIndex: index,
+        }))
+        .filter(item => item.userAnswer !== item.question.correctIndex);
       setTestHistory(prev => [...prev, {
         type: testType,
         score,
@@ -148,12 +194,56 @@ export function QuizPage() {
         timeLimitMinutes: activeConfig?.timeLimitMinutes ?? 15,
         timeSpentSeconds,
       }].slice(-20));
+      if (wrongItems.length > 0) {
+        setWrongQuestionBook(prev => {
+          const mapped = new Map(prev.map(item => [item.id, normalizeWrongQuestionRecord(item)]));
+          wrongItems.forEach(item => {
+            const id = createWrongQuestionId(testType, item.question.question);
+            const existing = mapped.get(id);
+            if (existing) {
+              mapped.set(id, {
+                ...existing,
+                options: item.question.options,
+                correctIndex: item.question.correctIndex,
+                explanation: item.question.explanation,
+                userAnswer: item.userAnswer,
+                sourceQuestionIndex: item.sourceQuestionIndex,
+                readingTitle: currentReading?.title || existing.readingTitle,
+                difficulty: activeConfig?.difficulty ?? existing.difficulty,
+                repeatCount: existing.repeatCount + 1,
+                wrongReason: existing.wrongReason || inferWrongReason(testType),
+                lastPracticedAt: nowIso,
+              });
+              return;
+            }
+            mapped.set(id, {
+              id,
+              type: testType,
+              question: item.question.question,
+              options: item.question.options,
+              correctIndex: item.question.correctIndex,
+              explanation: item.question.explanation,
+              userAnswer: item.userAnswer,
+              wrongReason: inferWrongReason(testType),
+              readingTitle: currentReading?.title || '未知阅读',
+              sourceQuestionIndex: item.sourceQuestionIndex,
+              difficulty: activeConfig?.difficulty ?? difficulty,
+              repeatCount: 1,
+              firstWrongAt: nowIso,
+              lastPracticedAt: nowIso,
+            });
+          });
+          return Array.from(mapped.values()).sort((a, b) => (
+            Date.parse(b.lastPracticedAt) - Date.parse(a.lastPracticedAt)
+          ));
+        });
+      }
       setPhase('result');
     } else {
       setQIndex(i => i + 1);
       setAnswered(false);
     }
-  }, [activeConfig, answered, currentReading, difficulty, qIndex, questions, quizStartedAt, setTestHistory, testType, userAnswers]);
+  }, [activeConfig, answered, currentReading, difficulty, qIndex, questions, quizStartedAt, setTestHistory, setWrongQuestionBook, testType, userAnswers]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -180,6 +270,9 @@ export function QuizPage() {
   const wrongQuestions = questions
     .map((q, i) => ({ ...q, userAnswer: userAnswers[i], index: i }))
     .filter(q => q.userAnswer !== q.correctIndex);
+  const wrongBookTotal = wrongQuestionBook.length;
+  const highRepeatWrongCount = wrongQuestionBook.filter(item => item.repeatCount >= 2).length;
+  const latestWrong = wrongQuestionBook[0] ?? null;
 
   const scoreColor = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-yellow-500' : 'text-red-500';
   const scoreEmoji = score >= 90 ? '🎉' : score >= 70 ? '👍' : score >= 50 ? '💪' : '📚';
@@ -496,6 +589,17 @@ export function QuizPage() {
         title="测试历史"
         description="最近测验会保存在本地，便于持续追踪。"
       >
+        <Card className="mb-4">
+          <p className="typo-body-sm text-muted-foreground">
+            错题本累计 <span className="font-semibold text-foreground">{wrongBookTotal}</span> 题，
+            重复错题 <span className="font-semibold text-foreground">{highRepeatWrongCount}</span> 题。
+          </p>
+          {latestWrong && (
+            <p className="text-xs text-muted-foreground mt-1.5 truncate">
+              最近错题：{latestWrong.question}
+            </p>
+          )}
+        </Card>
         <Card>
           {testHistory.length > 0 ? (
             <div className="space-y-2">

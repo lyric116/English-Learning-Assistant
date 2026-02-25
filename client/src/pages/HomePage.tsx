@@ -65,7 +65,7 @@ export function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="mb-16 text-center animate-fade-in-up">
+      <section className="mb-16 text-center animate-fade-in-up home-hero-shell">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300 text-sm font-medium mb-6">
           <Sparkles className="h-3.5 w-3.5" /> AI 驱动的英语学习助手
         </div>
@@ -77,7 +77,7 @@ export function HomePage() {
         </p>
         <div className="mt-8">
           <Link to="/flashcards">
-            <Button size="lg" className="shadow-lg hover:shadow-xl transition-shadow">
+            <Button size="lg" className="transition-shadow">
               开始学习 <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           </Link>
@@ -89,7 +89,7 @@ export function HomePage() {
         {features.map((f, i) => (
           <Card
             key={f.title}
-            className="group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-fade-in-up"
+            className="group home-feature-card hover:-translate-y-1 animate-fade-in-up"
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <div className="flex items-center gap-3 mb-3">
@@ -116,11 +116,11 @@ export function HomePage() {
       </div>
 
       {/* How to use */}
-      <section className="bg-muted/50 rounded-2xl p-8 md:p-10 mb-12 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+      <section className="ds-glass-panel p-8 md:p-10 mb-12 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
         <h2 className="text-2xl font-bold mb-8 text-center">如何使用</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {steps.map((s, i) => (
-            <div key={s.num} className="relative bg-card p-5 rounded-xl shadow-sm hover:shadow-md transition">
+            <div key={s.num} className="relative bg-card p-5 home-step-card">
               <div className="flex justify-center items-center h-10 w-10 rounded-full bg-primary-500 text-white mb-4 mx-auto font-bold">
                 {s.num}
               </div>

@@ -1,5 +1,37 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-01-design-tokens)
+
+### Completed
+- Completed `P1-01` (global design token foundation).
+- Added token system in `client/src/index.css`:
+  - spacing (`--ds-space-*`)
+  - radius (`--ds-radius-*`)
+  - elevation (`--ds-shadow-*`)
+  - motion (`--ds-duration-*`, `--ds-ease-standard`)
+  - z-index (`--ds-z-*`)
+  - semantic surfaces (`--ds-surface-*`)
+- Added shared token-driven surface classes:
+  - `.ds-card`
+  - `.ds-glass-panel`
+  - `.home-hero-shell`
+  - `.home-feature-card`
+  - `.home-step-card`
+  - `.app-navbar`
+- Applied token usage to required pages:
+  - Home page (`client/src/pages/HomePage.tsx`)
+  - Business page: Flashcards (`client/src/pages/FlashcardsPage.tsx`)
+  - Shared card primitive (`client/src/components/ui/Card.tsx`)
+  - Navbar z-layer (`client/src/components/layout/Navbar.tsx`)
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `npm run build` ✅
+
+### Notes For Next Developer
+- `P1-01` completed with token definitions + real page usage evidence.
+- Next step is `P1-02` (typography hierarchy normalization) on top of the new token baseline.
+
 ## 2026-02-25 (complete/p0-04-functional-baseline)
 
 ### Completed

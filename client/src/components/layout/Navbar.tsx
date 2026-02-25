@@ -24,7 +24,7 @@ function NavbarContent({ pathname, theme, onToggleTheme, onOpenSettings }: Navba
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="bg-card/80 backdrop-blur-lg border-b border-border/50 sticky top-0 z-50">
+    <nav className="app-navbar bg-card/80 backdrop-blur-lg border-b border-border/50 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center gap-2 group">

@@ -1,5 +1,27 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Design Token Foundation (`P1-01`)
+
+### `client/src/index.css`
+- Added centralized design tokens under `:root` / `.dark`:
+  - spacing, radius, shadows, motion timing, z-index, semantic surfaces.
+- Added token-driven shared classes (`.ds-card`, `.ds-glass-panel`, `.home-*`, `.app-navbar`).
+- Existing flashcard primitives were partially switched from hard-coded values to token values (radius/shadow/transition/z-index/progress animation).
+
+### `client/src/components/ui/Card.tsx`
+- Card primitive now includes `ds-card`, making tokenized radius/shadow/transition available app-wide without page-level duplication.
+
+### `client/src/pages/HomePage.tsx`
+- Home hero, feature cards, and onboarding section now consume token-driven classes (`home-hero-shell`, `home-feature-card`, `home-step-card`, `ds-glass-panel`).
+- Confirms the token layer is used by the homepage per plan requirement.
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Input panel now uses `ds-glass-panel`.
+- Together with tokenized flashcard CSS primitives, this confirms business-module token adoption.
+
+### `client/src/components/layout/Navbar.tsx`
+- Added `app-navbar` hook class for z-index token wiring.
+
 ## Update 2026-02-25: Functional Baseline Closure (`P0-04`)
 
 ### `code/functional_baseline.md`

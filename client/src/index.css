@@ -28,6 +28,47 @@
 }
 
 @layer base {
+  :root {
+    /* Design tokens: spacing */
+    --ds-space-1: 0.25rem;
+    --ds-space-2: 0.5rem;
+    --ds-space-3: 0.75rem;
+    --ds-space-4: 1rem;
+    --ds-space-5: 1.25rem;
+    --ds-space-6: 1.5rem;
+    --ds-space-8: 2rem;
+    --ds-space-10: 2.5rem;
+
+    /* Design tokens: radius */
+    --ds-radius-sm: 0.5rem;
+    --ds-radius-md: 0.75rem;
+    --ds-radius-lg: 1rem;
+    --ds-radius-xl: 1.25rem;
+    --ds-radius-2xl: 1.5rem;
+    --ds-radius-pill: 999px;
+
+    /* Design tokens: elevation */
+    --ds-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --ds-shadow-md: 0 6px 18px rgba(15, 23, 42, 0.12);
+    --ds-shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.16);
+
+    /* Design tokens: motion */
+    --ds-duration-fast: 160ms;
+    --ds-duration-base: 280ms;
+    --ds-duration-slow: 420ms;
+    --ds-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Design tokens: z-index */
+    --ds-z-float: 10;
+    --ds-z-nav: 50;
+    --ds-z-modal: 90;
+
+    /* Design tokens: semantic surfaces */
+    --ds-surface-panel: rgba(255, 255, 255, 0.72);
+    --ds-surface-panel-border: rgba(14, 165, 233, 0.2);
+    --ds-surface-hero: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(129, 140, 248, 0.1));
+  }
+
   .dark {
     --color-background: #0f172a;
     --color-foreground: #f1f5f9;
@@ -36,6 +77,12 @@
     --color-muted: #334155;
     --color-muted-foreground: #94a3b8;
     --color-border: #334155;
+    --ds-shadow-sm: 0 1px 3px rgba(2, 6, 23, 0.45);
+    --ds-shadow-md: 0 8px 20px rgba(2, 6, 23, 0.5);
+    --ds-shadow-lg: 0 14px 32px rgba(2, 6, 23, 0.58);
+    --ds-surface-panel: rgba(30, 41, 59, 0.72);
+    --ds-surface-panel-border: rgba(56, 189, 248, 0.22);
+    --ds-surface-hero: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(139, 92, 246, 0.16));
   }
 
   body {
@@ -46,6 +93,52 @@
   *:focus-visible {
     @apply outline-2 outline-offset-2 outline-primary-500;
   }
+}
+
+/* Token-driven shared surfaces (P1-01) */
+.ds-card {
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-sm);
+  transition-duration: var(--ds-duration-base);
+  transition-timing-function: var(--ds-ease-standard);
+}
+
+.ds-glass-panel {
+  background: var(--ds-surface-panel);
+  border: 1px solid var(--ds-surface-panel-border);
+  border-radius: var(--ds-radius-xl);
+  box-shadow: var(--ds-shadow-sm);
+  backdrop-filter: blur(8px);
+}
+
+.home-hero-shell {
+  background: var(--ds-surface-hero);
+  border: 1px solid var(--ds-surface-panel-border);
+  border-radius: var(--ds-radius-2xl);
+  box-shadow: var(--ds-shadow-sm);
+  padding: var(--ds-space-10) var(--ds-space-6);
+}
+
+.home-feature-card {
+  transition: transform var(--ds-duration-base) var(--ds-ease-standard),
+              box-shadow var(--ds-duration-base) var(--ds-ease-standard);
+}
+.home-feature-card:hover {
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.home-step-card {
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-sm);
+  transition: box-shadow var(--ds-duration-base) var(--ds-ease-standard),
+              transform var(--ds-duration-base) var(--ds-ease-standard);
+}
+.home-step-card:hover {
+  box-shadow: var(--ds-shadow-md);
+}
+
+.app-navbar {
+  z-index: var(--ds-z-nav);
 }
 
 /* Page enter animation */
@@ -125,7 +218,7 @@
 }
 .flashcard-premium-inner {
   background: var(--color-card);
-  border-radius: calc(1.25rem - 3px);
+  border-radius: calc(var(--ds-radius-xl) - 3px);
   width: 100%;
   height: 100%;
 }
@@ -152,16 +245,16 @@
 
 /* Progress bar */
 .flashcard-progress-track {
-  height: 4px;
-  border-radius: 2px;
+  height: var(--ds-space-1);
+  border-radius: var(--ds-radius-pill);
   background: var(--color-border);
   overflow: hidden;
 }
 .flashcard-progress-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--ds-radius-pill);
   background: linear-gradient(90deg, var(--color-primary-400), var(--color-primary-600));
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--ds-duration-slow) var(--ds-ease-standard);
 }
 
 /* Horizontal word list */
@@ -184,23 +277,23 @@
   transform: translateY(-50%);
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: var(--ds-radius-pill);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: var(--ds-shadow-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 10;
+  transition: all var(--ds-duration-fast) var(--ds-ease-standard);
+  z-index: var(--ds-z-float);
   color: var(--color-muted-foreground);
 }
 .flashcard-nav-arrow:hover:not(:disabled) {
   background: var(--color-primary-50);
   border-color: var(--color-primary-300);
   color: var(--color-primary-600);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: var(--ds-shadow-md);
 }
 .dark .flashcard-nav-arrow:hover:not(:disabled) {
   background: var(--color-primary-900);

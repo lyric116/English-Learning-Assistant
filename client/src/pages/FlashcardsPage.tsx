@@ -105,7 +105,7 @@ export function FlashcardsPage() {
       <AIConfigBanner />
 
       {/* Input area */}
-      <Card className="mb-10">
+      <Card className="mb-10 ds-glass-panel">
         <Textarea
           rows={4}
           placeholder="在此粘贴英文文本，AI 将自动提取值得学习的单词..."

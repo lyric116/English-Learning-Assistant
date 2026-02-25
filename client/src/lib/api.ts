@@ -10,11 +10,18 @@ type ReadingLanguage = 'en' | 'zh';
 type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
 type ReadingDifficulty = 'easy' | 'medium' | 'hard';
 type ReadingLength = 'short' | 'medium' | 'long';
+type QuizDifficulty = 'easy' | 'medium' | 'hard';
 type ReadingGenerateOptions = {
   language?: ReadingLanguage;
   topic?: ReadingTopic;
   difficulty?: ReadingDifficulty;
   length?: ReadingLength;
+};
+type QuizGenerateOptions = {
+  questionCount?: number;
+  difficulty?: QuizDifficulty;
+  timedMode?: boolean;
+  timeLimitMinutes?: number;
 };
 
 function isAiRequest(url: string, method: string): boolean {
@@ -118,16 +125,20 @@ export const api = {
     },
   },
   quiz: {
-    readingQuestions: (reading: string, questionCount?: number) =>
-      request('/quiz/reading-questions', {
+    readingQuestions: (reading: string, options?: number | QuizGenerateOptions) => {
+      const payload = typeof options === 'number' ? { questionCount: options } : (options ?? {});
+      return request('/quiz/reading-questions', {
         method: 'POST',
-        body: JSON.stringify({ reading, questionCount }),
-      }),
-    vocabularyQuestions: (vocabulary: unknown[], questionCount?: number) =>
-      request('/quiz/vocabulary-questions', {
+        body: JSON.stringify({ reading, ...payload }),
+      });
+    },
+    vocabularyQuestions: (vocabulary: unknown[], options?: number | QuizGenerateOptions) => {
+      const payload = typeof options === 'number' ? { questionCount: options } : (options ?? {});
+      return request('/quiz/vocabulary-questions', {
         method: 'POST',
-        body: JSON.stringify({ vocabulary, questionCount }),
-      }),
+        body: JSON.stringify({ vocabulary, ...payload }),
+      });
+    },
   },
   report: {
     generate: (reportType: string, learningData: unknown) =>

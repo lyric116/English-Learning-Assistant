@@ -6,8 +6,19 @@ export const quizRouter = Router();
 
 quizRouter.post('/reading-questions', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { reading, questionCount, aiConfig } = validateReadingQuestionsPayload(req.body);
-    const result = await generateReadingQuestions(reading, questionCount, aiConfig);
+    const {
+      reading,
+      questionCount,
+      difficulty,
+      timedMode,
+      timeLimitMinutes,
+      aiConfig,
+    } = validateReadingQuestionsPayload(req.body);
+    const result = await generateReadingQuestions(
+      reading,
+      { questionCount, difficulty, timedMode, timeLimitMinutes },
+      aiConfig,
+    );
     res.json(result);
   } catch (err) {
     next(err);
@@ -16,8 +27,19 @@ quizRouter.post('/reading-questions', async (req: Request, res: Response, next: 
 
 quizRouter.post('/vocabulary-questions', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { vocabulary, questionCount, aiConfig } = validateVocabularyQuestionsPayload(req.body);
-    const result = await generateVocabularyQuestions(vocabulary, questionCount, aiConfig);
+    const {
+      vocabulary,
+      questionCount,
+      difficulty,
+      timedMode,
+      timeLimitMinutes,
+      aiConfig,
+    } = validateVocabularyQuestionsPayload(req.body);
+    const result = await generateVocabularyQuestions(
+      vocabulary,
+      { questionCount, difficulty, timedMode, timeLimitMinutes },
+      aiConfig,
+    );
     res.json(result);
   } catch (err) {
     next(err);

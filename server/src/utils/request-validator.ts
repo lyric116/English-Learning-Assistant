@@ -35,12 +35,18 @@ interface ReadingGeneratePayload {
 interface ReadingQuestionsPayload {
   reading: string;
   questionCount: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timedMode: boolean;
+  timeLimitMinutes: number;
   aiConfig?: ValidatedAIConfig;
 }
 
 interface VocabularyQuestionsPayload {
   vocabulary: unknown[];
   questionCount: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timedMode: boolean;
+  timeLimitMinutes: number;
   aiConfig?: ValidatedAIConfig;
 }
 
@@ -136,6 +142,20 @@ function readOptionalEnum<T extends string>(
   }
 
   return value as T;
+}
+
+function readOptionalBoolean(
+  obj: ObjectRecord,
+  key: string,
+  defaultValue: boolean,
+  label: string,
+): boolean {
+  const value = obj[key];
+  if (value === undefined) return defaultValue;
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${label}必须是布尔值`);
+  }
+  return value;
 }
 
 function readRequiredEnum<T extends string>(
@@ -243,9 +263,12 @@ export function validateReadingQuestionsPayload(body: unknown): ReadingQuestions
 
   const reading = readRequiredString(obj, 'reading', '阅读内容', MAX_READING_LENGTH);
   const questionCount = readOptionalInteger(obj, 'questionCount', 5, '题目数量', 1, 20);
+  const difficulty = readOptionalEnum(obj, 'difficulty', 'medium', '题目难度', ['easy', 'medium', 'hard'] as const);
+  const timedMode = readOptionalBoolean(obj, 'timedMode', false, '限时模式');
+  const timeLimitMinutes = readOptionalInteger(obj, 'timeLimitMinutes', 15, '限时分钟', 1, 60);
   const aiConfig = readOptionalAiConfig(obj);
 
-  return { reading, questionCount, aiConfig };
+  return { reading, questionCount, difficulty, timedMode, timeLimitMinutes, aiConfig };
 }
 
 export function validateVocabularyQuestionsPayload(body: unknown): VocabularyQuestionsPayload {
@@ -253,9 +276,12 @@ export function validateVocabularyQuestionsPayload(body: unknown): VocabularyQue
 
   const vocabulary = readRequiredArray(obj, 'vocabulary', '词汇列表', 1, 500);
   const questionCount = readOptionalInteger(obj, 'questionCount', 5, '题目数量', 1, 20);
+  const difficulty = readOptionalEnum(obj, 'difficulty', 'medium', '题目难度', ['easy', 'medium', 'hard'] as const);
+  const timedMode = readOptionalBoolean(obj, 'timedMode', false, '限时模式');
+  const timeLimitMinutes = readOptionalInteger(obj, 'timeLimitMinutes', 15, '限时分钟', 1, 60);
   const aiConfig = readOptionalAiConfig(obj);
 
-  return { vocabulary, questionCount, aiConfig };
+  return { vocabulary, questionCount, difficulty, timedMode, timeLimitMinutes, aiConfig };
 }
 
 export function validateReportGeneratePayload(body: unknown): ReportGeneratePayload {

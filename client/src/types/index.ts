@@ -105,6 +105,16 @@ export interface ReadingFavorite extends ReadingContent {
 }
 
 // Quiz
+export type QuizDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface QuizGenerationConfig {
+  testType: 'reading' | 'vocabulary';
+  questionCount: number;
+  difficulty: QuizDifficulty;
+  timedMode: boolean;
+  timeLimitMinutes: number;
+}
+
 export interface QuizQuestion {
   question: string;
   options: string[];
@@ -117,6 +127,11 @@ export interface TestResult {
   score: number;
   date: string;
   readingTitle: string;
+  questionCount?: number;
+  difficulty?: QuizDifficulty;
+  timedMode?: boolean;
+  timeLimitMinutes?: number;
+  timeSpentSeconds?: number;
 }
 
 export interface FlashcardSessionSummary {

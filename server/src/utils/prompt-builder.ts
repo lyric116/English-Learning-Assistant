@@ -198,12 +198,34 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
 }`;
 }
 
-export function buildReadingQuestionsPrompt(reading: string, questionCount: number): string {
-  return `请根据以下英语内容，生成${questionCount}道多选题测试阅读理解：
+interface QuizPromptOptions {
+  questionCount: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timedMode: boolean;
+  timeLimitMinutes: number;
+}
+
+const QUIZ_DIFFICULTY_PROMPT_MAP: Record<QuizPromptOptions['difficulty'], string> = {
+  easy: '基础难度（信息点明确，干扰项简单）',
+  medium: '中等难度（包含推理与细节定位）',
+  hard: '高难度（强调深层理解与逻辑判断）',
+};
+
+export function buildReadingQuestionsPrompt(reading: string, options: QuizPromptOptions): string {
+  const difficultyPrompt = QUIZ_DIFFICULTY_PROMPT_MAP[options.difficulty];
+  const timingPrompt = options.timedMode
+    ? `本次测试为限时模式，总时长约 ${options.timeLimitMinutes} 分钟，请控制单题阅读负担。`
+    : '本次测试非限时，可适度提升解释完整度。';
+
+  return `请根据以下英语内容，生成${options.questionCount}道多选题测试阅读理解：
 
 内容：${reading}
 
-请生成${questionCount}道单选题，每题4个选项，只有1个正确答案。
+出题要求：
+- 难度：${difficultyPrompt}
+- 限时策略：${timingPrompt}
+
+请生成${options.questionCount}道单选题，每题4个选项，只有1个正确答案。
 每道题目应包含：问题、4个选项、正确答案索引（0-3）、解释。
 
 请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识（Markdown、HTML等）和符号：
@@ -217,12 +239,21 @@ export function buildReadingQuestionsPrompt(reading: string, questionCount: numb
 ]`;
 }
 
-export function buildVocabularyQuestionsPrompt(vocabulary: unknown[], questionCount: number): string {
-  return `请根据以下词汇列表，生成${questionCount}道单选题测试词汇掌握程度：
+export function buildVocabularyQuestionsPrompt(vocabulary: unknown[], options: QuizPromptOptions): string {
+  const difficultyPrompt = QUIZ_DIFFICULTY_PROMPT_MAP[options.difficulty];
+  const timingPrompt = options.timedMode
+    ? `本次测试为限时模式，总时长约 ${options.timeLimitMinutes} 分钟，请提高题干直达性。`
+    : '本次测试非限时，可包含适度干扰项。';
+
+  return `请根据以下词汇列表，生成${options.questionCount}道单选题测试词汇掌握程度：
 
 ${JSON.stringify(vocabulary)}
 
-请生成${questionCount}道单选题，每题4个选项，只有1个正确答案。
+出题要求：
+- 难度：${difficultyPrompt}
+- 限时策略：${timingPrompt}
+
+请生成${options.questionCount}道单选题，每题4个选项，只有1个正确答案。
 题目类型可以包括：选择正确释义、选择正确用法、选择近义词、选择反义词等。
 每道题目应包含：问题、4个选项、正确答案索引（0-3）、解释。
 

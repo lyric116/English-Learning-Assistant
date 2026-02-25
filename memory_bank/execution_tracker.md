@@ -39,7 +39,7 @@
 | 33 | P2-R-04 | completed | Favorites upgraded with tag metadata, search filtering, and sortable views (latest/oldest/title/vocab count) plus legacy favorite migration. |
 | 34 | P2-R-05 | completed (out-of-order) | Reading->Quiz context persistence implemented on 2026-02-24 (see `progress.md`). |
 | 35 | P2-R-06 | completed | Reading regression checklist executed (`code/reading_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
-| 36 | P2-Q-01 | pending | Not started. |
+| 36 | P2-Q-01 | completed | Quiz now supports configurable generation params (`type/difficulty/questionCount/timedMode/timeLimitMinutes`) across UI/API/validator/prompt contract, with test history carrying config snapshot. |
 | 37 | P2-Q-02 | pending | Not started. |
 | 38 | P2-Q-03 | pending | Not started. |
 | 39 | P2-Q-04 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-Q-01`.
+- First not-yet-completed step: `P2-Q-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

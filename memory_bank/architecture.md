@@ -1,5 +1,49 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Quiz Parameter Contract Extension (`P2-Q-01`)
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz generation config entry and runtime metadata holder.
+- Changes:
+  - added config controls for:
+    - `questionCount`
+    - `difficulty`
+    - `timedMode`
+    - `timeLimitMinutes`
+  - quiz start now sends full config payload
+  - active config snapshot persisted into test history entries
+  - non-select stage now displays active config summary
+
+### `client/src/lib/api.ts`
+- Role: quiz API boundary.
+- Changes:
+  - quiz endpoints now accept structured options payload
+  - backward compatibility retained for legacy numeric `questionCount` calls
+
+### `server/src/utils/request-validator.ts`
+- Role: quiz request schema gate.
+- Changes:
+  - reading/vocabulary question payloads now validate:
+    - `questionCount`
+    - `difficulty`
+    - `timedMode`
+    - `timeLimitMinutes`
+
+### `server/src/routes/quiz.ts`
+- Role: quiz route-to-service mapping layer.
+- Changes:
+  - forwards full validated quiz option object to service methods
+
+### `server/src/services/ai-service.ts`
+### `server/src/utils/prompt-builder.ts`
+- Role: quiz generation policy and prompt assembly.
+- Changes:
+  - quiz generation now uses normalized options object
+  - prompt builder includes difficulty + timing constraints for question generation behavior
+
+### Architectural Impact
+- Quiz generation moved from single-parameter call to multi-parameter contract with client-server alignment and backward compatibility.
+
 ## Update 2026-02-25: Reading Regression Closure (`P2-R-06`)
 
 ### `code/reading_regression_checklist.md`

@@ -26,6 +26,13 @@ interface ReadingGenerateOptions {
   length: 'short' | 'medium' | 'long';
 }
 
+interface QuizGenerateOptions {
+  questionCount: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  timedMode: boolean;
+  timeLimitMinutes: number;
+}
+
 interface ErrorBody {
   error?: { message?: string };
 }
@@ -157,6 +164,15 @@ function normalizeReadingOptions(options?: Partial<ReadingGenerateOptions>): Rea
   };
 }
 
+function normalizeQuizOptions(options?: Partial<QuizGenerateOptions>): QuizGenerateOptions {
+  return {
+    questionCount: options?.questionCount ?? 5,
+    difficulty: options?.difficulty ?? 'medium',
+    timedMode: options?.timedMode ?? false,
+    timeLimitMinutes: options?.timeLimitMinutes ?? 15,
+  };
+}
+
 function normalizeReadingResponse(payload: unknown) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('阅读生成失败：AI 返回格式无效');
@@ -264,14 +280,16 @@ export async function generateReadingContent(text: string, options?: Partial<Rea
   return normalizeReadingResponse(result);
 }
 
-export async function generateReadingQuestions(reading: string, questionCount = 5, aiConfig?: AIConfig) {
-  const prompt = buildReadingQuestionsPrompt(reading, questionCount);
+export async function generateReadingQuestions(reading: string, options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeQuizOptions(options);
+  const prompt = buildReadingQuestionsPrompt(reading, normalizedOptions);
   const content = await sendRequest(prompt, { temperature: 0.6, maxTokens: 1500 }, aiConfig);
   return parseJsonResponse(content);
 }
 
-export async function generateVocabularyQuestions(vocabulary: unknown[], questionCount = 5, aiConfig?: AIConfig) {
-  const prompt = buildVocabularyQuestionsPrompt(vocabulary, questionCount);
+export async function generateVocabularyQuestions(vocabulary: unknown[], options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeQuizOptions(options);
+  const prompt = buildVocabularyQuestionsPrompt(vocabulary, normalizedOptions);
   const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1500 }, aiConfig);
   return parseJsonResponse(content);
 }

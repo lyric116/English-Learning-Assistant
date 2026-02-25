@@ -1,5 +1,28 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-01-quiz-parameter-extension)
+
+### Completed
+- Completed `P2-Q-01` (测验参数扩展：题型/难度/题量/限时配置).
+- Frontend:
+  - `QuizPage`新增配置面板：`questionCount/difficulty/timedMode/timeLimitMinutes`
+  - 生成请求会携带上述参数，且在测试过程与历史记录中保留配置快照
+- API client:
+  - `api.quiz.readingQuestions` / `api.quiz.vocabularyQuestions` 升级为支持结构化参数（兼容旧 number 传参）
+- Backend:
+  - 请求校验升级（题量/难度/限时参数）
+  - `quiz` 路由透传配置到 service
+  - 题目 prompt 升级，支持按难度与限时场景出题约束
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-01` is complete with end-to-end quiz parameter contract coverage.
+- Next step is `P2-Q-02` (错题本数据模型与记录机制).
+
 ## 2026-02-25 (complete/p2-r-06-reading-regression)
 
 ### Completed

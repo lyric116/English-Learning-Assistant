@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
@@ -14,10 +15,16 @@ import {
   BookOpen, Type, ListChecks, RotateCcw,
   Trophy, ChevronRight, AlertTriangle, CheckCircle2, XCircle,
 } from 'lucide-react';
-import type { QuizQuestion, ReadingContent, TestResult } from '@/types';
+import type { QuizDifficulty, QuizGenerationConfig, QuizQuestion, ReadingContent, TestResult } from '@/types';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
 type Phase = 'select' | 'quiz' | 'result';
+const QUIZ_DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
+  easy: '基础',
+  medium: '进阶',
+  hard: '高阶',
+};
+const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20];
 
 export function QuizPage() {
   const quizContextKey = 'quizCurrentReading';
@@ -35,6 +42,12 @@ export function QuizPage() {
   const [answered, setAnswered] = useState(false);
   const [testType, setTestType] = useState<'reading' | 'vocabulary'>('reading');
   const [showReview, setShowReview] = useState(false);
+  const [difficulty, setDifficulty] = useState<QuizDifficulty>('medium');
+  const [questionCount, setQuestionCount] = useState(5);
+  const [timedMode, setTimedMode] = useState(false);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
+  const [activeConfig, setActiveConfig] = useState<QuizGenerationConfig | null>(null);
+  const [quizStartedAt, setQuizStartedAt] = useState<number | null>(null);
   const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [testHistory, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
   const currentReading = routeReading ?? storedReading;
@@ -52,21 +65,48 @@ export function QuizPage() {
       navigate('/reading');
       return;
     }
+    if (questionCount < 1 || questionCount > 20) {
+      toast('题量必须在 1 到 20 之间', 'warning');
+      return;
+    }
+    if (timeLimitMinutes < 1 || timeLimitMinutes > 60) {
+      toast('限时分钟必须在 1 到 60 之间', 'warning');
+      return;
+    }
     setErrorMessage('');
     setTestType(type);
     setLoading(true);
     try {
+      const config: QuizGenerationConfig = {
+        testType: type,
+        questionCount,
+        difficulty,
+        timedMode,
+        timeLimitMinutes,
+      };
       const result = type === 'reading'
-        ? await api.quiz.readingQuestions(currentReading.english) as QuizQuestion[]
-        : await api.quiz.vocabularyQuestions(currentReading.vocabulary) as QuizQuestion[];
+        ? await api.quiz.readingQuestions(currentReading.english, {
+          questionCount,
+          difficulty,
+          timedMode,
+          timeLimitMinutes,
+        }) as QuizQuestion[]
+        : await api.quiz.vocabularyQuestions(currentReading.vocabulary, {
+          questionCount,
+          difficulty,
+          timedMode,
+          timeLimitMinutes,
+        }) as QuizQuestion[];
       if (!Array.isArray(result) || result.length === 0) {
         toast('未生成有效题目，请重试或更换阅读内容', 'warning');
         return;
       }
       setQuestions(result);
+      setActiveConfig(config);
       setUserAnswers(new Array(result.length).fill(null));
       setQIndex(0);
       setAnswered(false);
+      setQuizStartedAt(Date.now());
       setPhase('quiz');
       setErrorMessage('');
       toast(`已生成 ${result.length} 道${type === 'reading' ? '阅读理解' : '词汇'}题`, 'success');
@@ -94,18 +134,26 @@ export function QuizPage() {
     if (qIndex + 1 >= questions.length) {
       const correct = userAnswers.filter((a, i) => a === questions[i].correctIndex).length;
       const score = Math.round((correct / questions.length) * 100);
+      const timeSpentSeconds = quizStartedAt
+        ? Math.max(1, Math.round((Date.now() - quizStartedAt) / 1000))
+        : undefined;
       setTestHistory(prev => [...prev, {
         type: testType,
         score,
         date: new Date().toISOString(),
         readingTitle: currentReading?.title || '未知阅读',
+        questionCount: activeConfig?.questionCount ?? questions.length,
+        difficulty: activeConfig?.difficulty ?? difficulty,
+        timedMode: activeConfig?.timedMode ?? false,
+        timeLimitMinutes: activeConfig?.timeLimitMinutes ?? 15,
+        timeSpentSeconds,
       }].slice(-20));
       setPhase('result');
     } else {
       setQIndex(i => i + 1);
       setAnswered(false);
     }
-  }, [answered, qIndex, questions, userAnswers, testType, currentReading, setTestHistory]);
+  }, [activeConfig, answered, currentReading, difficulty, qIndex, questions, quizStartedAt, setTestHistory, testType, userAnswers]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -152,7 +200,7 @@ export function QuizPage() {
         index={0}
         type="input"
         title="选择测试输入"
-        description="先确定测试来源与题型。"
+        description="设置题型参数后开始测试。"
       >
         {phase === 'select' && !loading ? (
           !currentReading ? (
@@ -167,7 +215,45 @@ export function QuizPage() {
               }
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <Card>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <Select value={String(questionCount)} onChange={e => setQuestionCount(Number(e.target.value))}>
+                    {QUESTION_COUNT_OPTIONS.map(item => (
+                      <option key={item} value={item}>{item} 题</option>
+                    ))}
+                  </Select>
+                  <Select value={difficulty} onChange={e => setDifficulty(e.target.value as QuizDifficulty)}>
+                    <option value="easy">基础难度</option>
+                    <option value="medium">进阶难度</option>
+                    <option value="hard">高阶难度</option>
+                  </Select>
+                  <Select value={timedMode ? 'timed' : 'free'} onChange={e => setTimedMode(e.target.value === 'timed')}>
+                    <option value="free">非限时</option>
+                    <option value="timed">限时模式</option>
+                  </Select>
+                  <Select
+                    value={String(timeLimitMinutes)}
+                    onChange={e => setTimeLimitMinutes(Number(e.target.value))}
+                    disabled={!timedMode}
+                  >
+                    <option value="5">5 分钟</option>
+                    <option value="10">10 分钟</option>
+                    <option value="15">15 分钟</option>
+                    <option value="20">20 分钟</option>
+                    <option value="30">30 分钟</option>
+                  </Select>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2.5 py-1">题量: {questionCount} 题</span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">难度: {QUIZ_DIFFICULTY_LABELS[difficulty]}</span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">
+                    模式: {timedMode ? `${timeLimitMinutes} 分钟限时` : '非限时'}
+                  </span>
+                </div>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card
                 className="cursor-pointer group hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-700 transition-all"
                 onClick={() => startQuiz('reading')}
@@ -196,13 +282,14 @@ export function QuizPage() {
                   根据学习的词汇生成测试题，检验词汇掌握情况。
                 </p>
               </Card>
+              </div>
               {currentReading.title && (
-                <p className="col-span-full text-center text-sm text-muted-foreground">
+                <p className="text-center text-sm text-muted-foreground">
                   当前阅读：<span className="font-medium text-foreground">{currentReading.title}</span>
                 </p>
               )}
               {restoredFromStorage && (
-                <p className="col-span-full text-center text-xs text-muted-foreground">
+                <p className="text-center text-xs text-muted-foreground">
                   已从本地恢复上次阅读上下文（页面刷新后仍可继续测试）。
                 </p>
               )}
@@ -215,6 +302,13 @@ export function QuizPage() {
                 {phase === 'quiz' ? '答题中' : phase === 'result' ? '查看结果' : '选择测试'}
               </span>
               {currentReading?.title ? <> · 阅读标题：<span className="font-semibold text-foreground">{currentReading.title}</span></> : null}
+              {activeConfig ? (
+                <>
+                  {' '}· 配置：<span className="font-semibold text-foreground">
+                    {activeConfig.questionCount}题 / {QUIZ_DIFFICULTY_LABELS[activeConfig.difficulty]} / {activeConfig.timedMode ? `${activeConfig.timeLimitMinutes}分钟限时` : '非限时'}
+                  </span>
+                </>
+              ) : null}
             </p>
           </Card>
         )}
@@ -240,6 +334,11 @@ export function QuizPage() {
                   }
                 </span>
               </div>
+              {activeConfig && (
+                <p className="mb-1.5 text-xs text-muted-foreground">
+                  难度 {QUIZ_DIFFICULTY_LABELS[activeConfig.difficulty]} · {activeConfig.timedMode ? `${activeConfig.timeLimitMinutes} 分钟限时` : '非限时'}
+                </p>
+              )}
               <div className="flashcard-progress-track">
                 <div
                   className="flashcard-progress-fill"
@@ -404,6 +503,9 @@ export function QuizPage() {
                 <div key={`${item.date}-${idx}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
                   <span className="font-medium">{item.type === 'reading' ? '阅读理解' : '词汇测试'}</span>
                   <span className="text-muted-foreground">{item.readingTitle}</span>
+                  <span className="text-muted-foreground">
+                    {item.questionCount ?? 5}题 · {item.difficulty ? QUIZ_DIFFICULTY_LABELS[item.difficulty] : '进阶'}
+                  </span>
                   <span className="font-semibold text-primary-600 dark:text-primary-400">{item.score} 分</span>
                 </div>
               ))}

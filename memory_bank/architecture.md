@@ -1,5 +1,45 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Input System Unification (`P1-05`)
+
+### `client/src/components/ui/form-control.ts`
+- Role: centralized style contract for all form-like controls.
+- Changes:
+  - defines shared base/default/error class sets
+  - keeps input/textarea/select visual behavior synchronized
+
+### `client/src/components/ui/Input.tsx`
+- Role: reusable single-line form input primitive.
+- Changes:
+  - built on shared form-control contract
+  - supports `error` state for visible invalid styling
+
+### `client/src/components/ui/Textarea.tsx`
+- Role: multiline input primitive used by module input panels.
+- Changes:
+  - migrated to shared form-control contract
+  - added `error` prop support while preserving textarea-specific sizing behavior
+
+### `client/src/components/ui/Select.tsx`
+- Role: dropdown primitive used across pages/settings.
+- Changes:
+  - migrated to shared form-control contract
+  - added `error` prop support
+
+### `client/src/components/settings/SettingsDialog.tsx`
+- Role: AI configuration form with validation and persistence.
+- Changes:
+  - switched native inputs to shared `Input` component
+  - added explicit field-level validation and inline error messaging
+  - wired `aria-invalid` for invalid fields and input-change error clearing
+  - keeps "test/save" paths using one validation source
+
+### `client/src/pages/FlashcardsPage.tsx` + `client/src/pages/ReadingPage.tsx`
+- Role: core module text input flows.
+- Architectural impact:
+  - these pages now inherit updated shared `Textarea` / `Select` styles automatically
+  - no page-level form style duplication needed
+
 ## Update 2026-02-25: Button System Unification (`P1-04`)
 
 ### `client/src/components/ui/Button.tsx`

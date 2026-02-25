@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-05-input-system-unification)
+
+### Completed
+- Completed `P1-05` (input component style unification).
+- Added shared form-control style tokens in `client/src/components/ui/form-control.ts`.
+- Added reusable `Input` component and aligned `Textarea` / `Select` to the same base style contract:
+  - consistent border, focus-visible ring, disabled style, spacing
+  - optional `error` state support
+- Refactored `SettingsDialog`:
+  - switched native inputs to shared `Input`
+  - added field-level validation and inline error messages for API Key / Base URL / Model
+  - added `aria-invalid` state wiring and error-clearing on input change
+- This aligns form behavior across settings dialog, flashcards input area, and reading input area.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-05` is complete; form controls now share one style baseline and visible error states.
+- Next step is `P1-06` (feedback component style unification).
+
 ## 2026-02-25 (complete/p1-04-button-system-unification)
 
 ### Completed

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Eye, EyeOff, Zap, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/toast-context';
 import { AI_PROVIDERS, STORAGE_KEY } from '@/lib/ai-providers';
@@ -16,7 +16,11 @@ interface Props {
   onClose: () => void;
 }
 
-const inputClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+interface FieldErrors {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}
 
 export function SettingsDialog({ open, onClose }: Props) {
   const { toast } = useToast();
@@ -26,11 +30,13 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [model, setModel] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const usage = getDailyAiUsage();
 
   // Load saved config
   useEffect(() => {
     if (!open) return;
+    setErrors({});
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -50,26 +56,56 @@ export function SettingsDialog({ open, onClose }: Props) {
     if (preset && id !== 'custom') {
       setBaseUrl(preset.baseUrl);
       setModel(preset.models[0] || '');
+      setErrors(prev => ({ ...prev, baseUrl: undefined, model: undefined }));
     }
+  }, []);
+
+  const clearFieldError = useCallback((field: keyof FieldErrors) => {
+    setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
   }, []);
 
   const currentProvider = AI_PROVIDERS.find(p => p.id === providerId);
 
-  const handleTest = async () => {
-    if (!apiKey || !baseUrl || !model) {
-      toast('请填写完整配置', 'warning');
-      return;
+  const validateForm = () => {
+    const nextErrors: FieldErrors = {};
+    const apiKeyTrimmed = apiKey.trim();
+    const baseUrlTrimmed = baseUrl.trim();
+    const modelTrimmed = model.trim();
+
+    if (!apiKeyTrimmed) nextErrors.apiKey = '请输入 API Key。';
+    if (!baseUrlTrimmed) nextErrors.baseUrl = '请输入 Base URL。';
+    if (!modelTrimmed) nextErrors.model = '请输入模型名称。';
+
+    let normalizedBaseUrl = '';
+    if (baseUrlTrimmed) {
+      const baseUrlValidation = validateBaseUrl(baseUrlTrimmed);
+      if (!baseUrlValidation.ok) {
+        nextErrors.baseUrl = baseUrlValidation.error;
+      } else {
+        normalizedBaseUrl = baseUrlValidation.normalized;
+      }
     }
 
-    const baseUrlValidation = validateBaseUrl(baseUrl);
-    if (!baseUrlValidation.ok) {
-      toast(baseUrlValidation.error, 'warning');
+    setErrors(nextErrors);
+    const hasErrors = Object.values(nextErrors).some(Boolean);
+    return {
+      ok: !hasErrors,
+      apiKey: apiKeyTrimmed,
+      baseUrl: normalizedBaseUrl,
+      model: modelTrimmed,
+    };
+  };
+
+  const handleTest = async () => {
+    const validation = validateForm();
+    if (!validation.ok) {
+      toast('请先修正表单错误再测试连接', 'warning');
       return;
     }
 
     setTesting(true);
     try {
-      await api.ai.test({ apiKey: apiKey.trim(), baseUrl: baseUrlValidation.normalized, model: model.trim() });
+      await api.ai.test({ apiKey: validation.apiKey, baseUrl: validation.baseUrl, model: validation.model });
       toast('连接成功', 'success');
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : '连接失败', 'error');
@@ -79,23 +115,18 @@ export function SettingsDialog({ open, onClose }: Props) {
   };
 
   const handleSave = () => {
-    if (!apiKey || !baseUrl || !model) {
-      toast('请填写完整配置', 'warning');
-      return;
-    }
-
-    const baseUrlValidation = validateBaseUrl(baseUrl);
-    if (!baseUrlValidation.ok) {
-      toast(baseUrlValidation.error, 'warning');
+    const validation = validateForm();
+    if (!validation.ok) {
+      toast('请先修正表单错误再保存', 'warning');
       return;
     }
 
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        apiKey: apiKey.trim(),
-        baseUrl: baseUrlValidation.normalized,
-        model: model.trim(),
+        apiKey: validation.apiKey,
+        baseUrl: validation.baseUrl,
+        model: validation.model,
       }),
     );
     toast('配置已保存', 'success');
@@ -108,6 +139,7 @@ export function SettingsDialog({ open, onClose }: Props) {
     setBaseUrl('');
     setModel('');
     setProviderId('deepseek');
+    setErrors({});
     toast('已清除配置，将使用服务端默认设置', 'info');
   };
 
@@ -143,13 +175,18 @@ export function SettingsDialog({ open, onClose }: Props) {
           <div>
             <label htmlFor="api-key-input" className="block text-sm font-medium mb-1.5">API Key</label>
             <div className="relative">
-              <input
+              <Input
                 id="api-key-input"
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
+                onChange={e => {
+                  setApiKey(e.target.value);
+                  clearFieldError('apiKey');
+                }}
                 placeholder="sk-..."
-                className={cn(inputClass, 'pr-10')}
+                className="pr-10"
+                error={!!errors.apiKey}
+                aria-invalid={!!errors.apiKey}
               />
               <button
                 type="button"
@@ -160,34 +197,45 @@ export function SettingsDialog({ open, onClose }: Props) {
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {errors.apiKey && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{errors.apiKey}</p>}
           </div>
 
           {/* Base URL */}
           <div>
             <label htmlFor="base-url-input" className="block text-sm font-medium mb-1.5">Base URL</label>
-            <input
+            <Input
               id="base-url-input"
               type="url"
               value={baseUrl}
-              onChange={e => setBaseUrl(e.target.value)}
+              onChange={e => {
+                setBaseUrl(e.target.value);
+                clearFieldError('baseUrl');
+              }}
               placeholder="https://api.example.com/v1"
-              className={inputClass}
               autoComplete="url"
+              error={!!errors.baseUrl}
+              aria-invalid={!!errors.baseUrl}
             />
+            {errors.baseUrl && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{errors.baseUrl}</p>}
           </div>
 
           {/* Model */}
           <div>
             <label htmlFor="model-input" className="block text-sm font-medium mb-1.5">模型</label>
-            <input
+            <Input
               id="model-input"
               type="text"
               value={model}
-              onChange={e => setModel(e.target.value)}
+              onChange={e => {
+                setModel(e.target.value);
+                clearFieldError('model');
+              }}
               placeholder="model-name"
-              className={inputClass}
+              error={!!errors.model}
+              aria-invalid={!!errors.model}
             />
-            {currentProvider && currentProvider.models.length > 0 && (
+            {errors.model && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{errors.model}</p>}
+            {!errors.model && currentProvider && currentProvider.models.length > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 常用: {currentProvider.models.join(', ')}
               </p>

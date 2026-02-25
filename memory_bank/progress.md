@@ -1,5 +1,29 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-03-flashcard-state-actions)
+
+### Completed
+- Completed `P2-F-03` (mastered/new/review operations for flashcards).
+- Added flashcard state operation controls in flashcards action zone:
+  - `标记生词`
+  - `加入复习`
+  - `标记掌握`
+- Added state transition update logic:
+  - updates `learningStatus`
+  - recalculates and persists `reviewCount` + `accuracy`
+  - updates `nextReviewAt` based on selected state strategy
+- UI feedback now reflects state operations immediately:
+  - front/back card metadata updates in place
+  - history summary counters and due-review count update in real time
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-F-03` is complete with immediate, persistent tri-state operation feedback.
+- Next step is `P2-F-04` (review queue strategy based on state + time).
+
 ## 2026-02-25 (complete/p2-f-02-extraction-params-and-contract)
 
 ### Completed

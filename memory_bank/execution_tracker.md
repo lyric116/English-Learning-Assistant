@@ -24,7 +24,7 @@
 | 18 | P1-10 | completed | Added key motion polish (`ModuleSection` stagger + result soft-pop) and mobile tap-target upgrades on high-frequency icon controls across modules. |
 | 19 | P2-F-01 | completed | Flashcard model extended with `learningStatus/nextReviewAt/accuracy/reviewCount`, including legacy localStorage migration on read. |
 | 20 | P2-F-02 | completed | Flashcard extraction contract upgraded: configurable `maxWords` in UI/API, validator boundary tightened to `1..30`, and backend extraction response normalized with explicit invalid-format failure messages. |
-| 21 | P2-F-03 | pending | Not started. |
+| 21 | P2-F-03 | completed | Added flashcard tri-state actions (`生词/复习/掌握`) with immediate local updates for status, review count, accuracy, and next review time. |
 | 22 | P2-F-04 | pending | Not started. |
 | 23 | P2-F-05 | pending | Not started. |
 | 24 | P2-F-06 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-F-03`.
+- First not-yet-completed step: `P2-F-04`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

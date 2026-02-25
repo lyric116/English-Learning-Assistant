@@ -1,5 +1,24 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcard Tri-State Operations (`P2-F-03`)
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard session interaction controller.
+- Changes:
+  - added three direct learning-state actions:
+    - `标记生词`
+    - `加入复习`
+    - `标记掌握`
+  - added performance update function to recompute:
+    - `reviewCount`
+    - `accuracy`
+    - `learningStatus`
+    - `nextReviewAt`
+  - state changes are persisted into localStorage-backed flashcard set immediately
+- UX impact:
+  - card metadata and history summary now react in real-time after each state action
+  - user gets immediate toast confirmation for each status update
+
 ## Update 2026-02-25: Flashcard Extraction Parameter & Contract Upgrade (`P2-F-02`)
 
 ### `client/src/pages/FlashcardsPage.tsx`

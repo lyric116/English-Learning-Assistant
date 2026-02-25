@@ -20,6 +20,8 @@ type RawWord = Omit<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'revi
   & Partial<Pick<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'reviewCount'>>;
 
 const REVIEW_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const NEW_WORD_REVIEW_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const MASTERED_REVIEW_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const STATUS_LABEL: Record<WordLearningStatus, string> = {
   new: '新词',
   reviewing: '复习中',
@@ -38,7 +40,11 @@ function isWordModelV2(word: RawWord): word is Word {
 function normalizeWord(raw: RawWord, now: number): Word {
   const reviewCount = typeof raw.reviewCount === 'number' && raw.reviewCount >= 0 ? raw.reviewCount : 0;
   const accuracy = typeof raw.accuracy === 'number' && raw.accuracy >= 0 ? raw.accuracy : 0;
-  const learningStatus: WordLearningStatus = raw.learningStatus ?? 'new';
+  const learningStatus: WordLearningStatus = raw.learningStatus === 'new'
+    || raw.learningStatus === 'reviewing'
+    || raw.learningStatus === 'mastered'
+    ? raw.learningStatus
+    : 'new';
   const nextReviewAt = typeof raw.nextReviewAt === 'number' ? raw.nextReviewAt : now + REVIEW_INTERVAL_MS;
   return {
     ...raw,
@@ -46,6 +52,21 @@ function normalizeWord(raw: RawWord, now: number): Word {
     nextReviewAt,
     accuracy,
     reviewCount,
+  };
+}
+
+function updateWordPerformance(word: Word, isCorrect: boolean, nextStatus: WordLearningStatus, nextReviewAt: number): Word {
+  const previousCorrect = Math.round((word.accuracy / 100) * word.reviewCount);
+  const nextReviewCount = word.reviewCount + 1;
+  const nextCorrect = previousCorrect + (isCorrect ? 1 : 0);
+  const nextAccuracy = Math.round((nextCorrect / nextReviewCount) * 100);
+
+  return {
+    ...word,
+    learningStatus: nextStatus,
+    nextReviewAt,
+    reviewCount: nextReviewCount,
+    accuracy: nextAccuracy,
   };
 }
 
@@ -166,6 +187,23 @@ export function FlashcardsPage() {
     setWords([]);
     setCurrentIndex(0);
     setFlipped(false);
+  };
+  const markCurrentWord = (nextStatus: WordLearningStatus) => {
+    if (!word) return;
+    const nowTs = Date.now();
+    const isCorrect = nextStatus === 'mastered';
+    const nextReviewAt = nextStatus === 'mastered'
+      ? nowTs + MASTERED_REVIEW_INTERVAL_MS
+      : nextStatus === 'reviewing'
+        ? nowTs + REVIEW_INTERVAL_MS
+        : nowTs + NEW_WORD_REVIEW_INTERVAL_MS;
+
+    setWords(prev => prev.map((item, index) => (
+      index === currentIndex
+        ? updateWordPerformance(item, isCorrect, nextStatus, nextReviewAt)
+        : item
+    )));
+    toast(`已标记为${STATUS_LABEL[nextStatus]}`, 'info');
   };
 
   return (
@@ -422,16 +460,29 @@ export function FlashcardsPage() {
       >
         <Card>
           {words.length > 0 && word ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" onClick={() => { setCurrentIndex(0); setFlipped(false); }}>
-                回到首张
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => speak(word.word)}>
-                朗读当前单词
-              </Button>
-              <Button variant="ghost" size="sm" onClick={clearWordSet}>
-                清空词卡集合
-              </Button>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => markCurrentWord('new')}>
+                  标记生词
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => markCurrentWord('reviewing')}>
+                  加入复习
+                </Button>
+                <Button size="sm" onClick={() => markCurrentWord('mastered')}>
+                  标记掌握
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => { setCurrentIndex(0); setFlipped(false); }}>
+                  回到首张
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => speak(word.word)}>
+                  朗读当前单词
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearWordSet}>
+                  清空词卡集合
+                </Button>
+              </div>
             </div>
           ) : (
             <p className="typo-body-sm text-muted-foreground">提取单词后，可在这里快速重置或清空学习会话。</p>

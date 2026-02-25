@@ -18,7 +18,7 @@
 | 12 | P1-04 | completed | Button system unified: primary/secondary/destructive/disabled interaction rules standardized and outline usage migrated. |
 | 13 | P1-05 | completed | Input system unified: shared form-control styles for Input/Textarea/Select, plus visible form error states in Settings dialog. |
 | 14 | P1-06 | completed | Feedback system unified: Loading/Empty/Toast/Skeleton refreshed and shared inline error alert applied to all five modules. |
-| 15 | P1-07 | pending | Not started. |
+| 15 | P1-07 | completed | Navigation and page shell refactored: Navbar/Footer/Layout spacing and layering unified, mobile menu overlay/collapse improved, settings entry stable on both desktop and mobile. |
 | 16 | P1-08 | pending | Not started. |
 | 17 | P1-09 | pending | Not started. |
 | 18 | P1-10 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P1-07`.
+- First not-yet-completed step: `P1-08`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

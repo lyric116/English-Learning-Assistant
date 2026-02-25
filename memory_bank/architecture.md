@@ -1,5 +1,36 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Navigation & Shell Refactor (`P1-07`)
+
+### `client/src/components/layout/Navbar.tsx`
+- Role: global route navigation + theme/settings controls.
+- Changes:
+  - unified desktop/mobile spacing and active-link behavior
+  - mobile navigation now uses overlay + panel collapse pattern
+  - all module entries preserved in mobile panel; settings entry available in mobile/desktop paths
+  - mobile open state now controls document scroll lock for stable interaction
+
+### `client/src/components/layout/Footer.tsx`
+- Role: global bottom navigation and product identity footer.
+- Changes:
+  - redesigned into shell-consistent surface with quick links to all five modules
+  - keeps navigation discoverability beyond top navbar context
+
+### `client/src/components/layout/Layout.tsx`
+- Role: page frame composition root.
+- Changes:
+  - switched to explicit shell/main structure using shared `app-shell` + `app-main` classes
+  - centralizes cross-page spacing and max-width behavior
+
+### `client/src/index.css`
+- Role: global design token and shell style registry.
+- Changes:
+  - added shell classes:
+    - `app-navbar-shell`
+    - `app-shell` (+ dark-mode variant)
+    - `app-main` (+ responsive width/padding rules)
+  - aligns navbar/footer/layout visual hierarchy under one style contract
+
 ## Update 2026-02-25: Feedback System Unification (`P1-06`)
 
 ### `client/src/components/ui/LoadingSpinner.tsx`

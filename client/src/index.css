@@ -156,6 +156,35 @@
   z-index: var(--ds-z-nav);
 }
 
+.app-navbar-shell {
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(14, 165, 233, 0.08), transparent 42%),
+    radial-gradient(circle at 85% 5%, rgba(99, 102, 241, 0.08), transparent 38%),
+    var(--color-background);
+}
+.dark .app-shell {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(14, 165, 233, 0.16), transparent 42%),
+    radial-gradient(circle at 85% 5%, rgba(99, 102, 241, 0.16), transparent 38%),
+    var(--color-background);
+}
+
+.app-main {
+  width: min(1120px, calc(100% - 2rem));
+  margin-inline: auto;
+  padding-block: var(--ds-space-8);
+}
+@media (min-width: 768px) {
+  .app-main {
+    width: min(1160px, calc(100% - 3rem));
+    padding-block: var(--ds-space-10);
+  }
+}
+
 /* Token-driven typography hierarchy (P1-02) */
 .typo-display {
   font-size: var(--ds-font-size-display);

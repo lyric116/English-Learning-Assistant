@@ -14,7 +14,7 @@ import {
   ThumbsUp, AlertTriangle, Lightbulb, Share2,
   X, BarChart3,
 } from 'lucide-react';
-import type { LearningReport, Word, ReadingContent, TestResult } from '@/types';
+import type { FlashcardSessionSummary, LearningReport, Word, ReadingContent, TestResult } from '@/types';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
 const reportTypes = [
@@ -22,6 +22,12 @@ const reportTypes = [
   { value: 'monthly', label: '月报', icon: BarChart3 },
   { value: 'term', label: '学期报告', icon: TrendingUp },
 ];
+
+function formatDateTime(value: string): string {
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) return value;
+  return new Date(ts).toLocaleString();
+}
 
 export function AchievementsPage() {
   const { toast } = useToast();
@@ -31,11 +37,15 @@ export function AchievementsPage() {
   const [report, setReport] = useState<LearningReport | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [flashcards] = useLocalStorage<Word[]>('flashcards', []);
+  const [flashcardSessionSummary] = useLocalStorage<FlashcardSessionSummary | null>('flashcardSessionSummary', null);
   const [readingHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
   const [testHistory] = useLocalStorage<TestResult[]>('testHistory', []);
   const [reportHistory, setReportHistory] = useLocalStorage<(LearningReport & { timestamp?: number })[]>('reportHistory', []);
 
-  const hasData = flashcards.length > 0 || readingHistory.length > 0 || testHistory.length > 0;
+  const hasData = flashcards.length > 0
+    || readingHistory.length > 0
+    || testHistory.length > 0
+    || Boolean(flashcardSessionSummary);
 
   const generateReport = async () => {
     if (!hasData) {
@@ -45,7 +55,7 @@ export function AchievementsPage() {
     setErrorMessage('');
     setLoading(true);
     try {
-      const learningData = { flashcards, readingHistory, testHistory };
+      const learningData = { flashcards, flashcardSessionSummary, readingHistory, testHistory };
       const result = await api.report.generate(selectedType, learningData) as LearningReport;
       setReport(result);
       setErrorMessage('');
@@ -61,8 +71,11 @@ export function AchievementsPage() {
   };
 
   const copyShareLink = () => {
+    const flashcardLine = flashcardSessionSummary
+      ? `🃏 闪卡会话: 学习${flashcardSessionSummary.studiedCount}词 · 正确率${flashcardSessionSummary.accuracy}% · 待复习${flashcardSessionSummary.dueCount}`
+      : '';
     const text = report
-      ? `📊 ${report.title}\n${report.summary}\n✅ 词汇: ${report.vocabulary.learned} | 📖 阅读: ${report.reading.articles}篇 | 🎯 测试: ${report.tests.averageScore}分`
+      ? `📊 ${report.title}\n${report.summary}\n✅ 词汇: ${report.vocabulary.learned} | 📖 阅读: ${report.reading.articles}篇 | 🎯 测试: ${report.tests.averageScore}分${flashcardLine ? `\n${flashcardLine}` : ''}`
       : '';
     navigator.clipboard.writeText(text).then(() => {
       toast('已复制到剪贴板', 'success');
@@ -273,6 +286,36 @@ export function AchievementsPage() {
             </div>
           ))}
         </div>
+
+        <Card className="mb-4">
+          <div className="analysis-card-header">
+            <BookOpen className="h-5 w-5 text-primary-500" />
+            <h3 className="font-bold">最近闪卡会话</h3>
+          </div>
+          {flashcardSessionSummary ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-xs">
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  提词数 <span className="font-semibold text-foreground">{flashcardSessionSummary.extractedCount}</span>
+                </span>
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  学习量 <span className="font-semibold text-foreground">{flashcardSessionSummary.studiedCount}</span>
+                </span>
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  正确率 <span className="font-semibold text-foreground">{flashcardSessionSummary.accuracy}%</span>
+                </span>
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  待复习 <span className="font-semibold text-foreground">{flashcardSessionSummary.dueCount}</span>
+                </span>
+              </div>
+              <p className="typo-body-sm text-muted-foreground">
+                开始于 {formatDateTime(flashcardSessionSummary.startedAt)}，最近更新 {formatDateTime(flashcardSessionSummary.updatedAt)}。
+              </p>
+            </>
+          ) : (
+            <p className="typo-body-sm text-muted-foreground">暂无闪卡会话统计，先在闪卡模块完成一轮学习。</p>
+          )}
+        </Card>
 
         <Card>
           {reportHistory.length > 0 ? (

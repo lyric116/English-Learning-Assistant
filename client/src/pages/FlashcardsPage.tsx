@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { ModuleSection } from '@/components/layout/ModuleSection';
 import { ChevronLeft, ChevronRight, Volume2, RotateCcw, Layers, BookOpen, Lightbulb, MessageSquareQuote } from 'lucide-react';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
-import type { Word, WordLearningStatus } from '@/types';
+import type { FlashcardSessionSummary, Word, WordLearningStatus } from '@/types';
 
 type RawWord = Omit<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'reviewCount'>
   & Partial<Pick<Word, 'learningStatus' | 'nextReviewAt' | 'accuracy' | 'reviewCount'>>;
@@ -70,6 +70,27 @@ function updateWordPerformance(word: Word, isCorrect: boolean, nextStatus: WordL
   };
 }
 
+interface SessionState {
+  sessionId: string;
+  startedAt: string;
+  extractedCount: number;
+  reviewedKeys: string[];
+  correctCount: number;
+  incorrectCount: number;
+}
+
+function createSessionState(extractedCount: number): SessionState {
+  const nowIso = new Date().toISOString();
+  return {
+    sessionId: nowIso,
+    startedAt: nowIso,
+    extractedCount,
+    reviewedKeys: [],
+    correctCount: 0,
+    incorrectCount: 0,
+  };
+}
+
 export function FlashcardsPage() {
   const [words, setWords] = useLocalStorage<Word[]>('flashcards', []);
   const [inputText, setInputText] = useState('');
@@ -79,6 +100,8 @@ export function FlashcardsPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>(() => createSessionState(0));
+  const [, setSessionSummary] = useLocalStorage<FlashcardSessionSummary | null>('flashcardSessionSummary', null);
   const { speak } = useTts();
   const { toast } = useToast();
 
@@ -107,6 +130,7 @@ export function FlashcardsPage() {
         now,
       ));
       setWords(normalizedResult);
+      setSessionState(createSessionState(normalizedResult.length));
       setCurrentIndex(0);
       setFlipped(false);
       setErrorMessage('');
@@ -215,8 +239,47 @@ export function FlashcardsPage() {
     return acc;
   }, { new: 0, reviewing: 0, mastered: 0 });
   const dueReviewCount = words.filter(item => item.nextReviewAt <= now && item.learningStatus !== 'mastered').length;
+  const sessionAttemptCount = sessionState.correctCount + sessionState.incorrectCount;
+  const sessionStudiedCount = sessionState.reviewedKeys.length;
+  const sessionAccuracy = sessionAttemptCount > 0
+    ? Math.round((sessionState.correctCount / sessionAttemptCount) * 100)
+    : 0;
+
+  useEffect(() => {
+    if (words.length === 0 && sessionState.extractedCount === 0 && sessionAttemptCount === 0) {
+      setSessionSummary(null);
+      return;
+    }
+    const summary: FlashcardSessionSummary = {
+      sessionId: sessionState.sessionId,
+      startedAt: sessionState.startedAt,
+      updatedAt: new Date().toISOString(),
+      extractedCount: sessionState.extractedCount > 0 ? sessionState.extractedCount : words.length,
+      studiedCount: sessionStudiedCount,
+      correctCount: sessionState.correctCount,
+      incorrectCount: sessionState.incorrectCount,
+      accuracy: sessionAccuracy,
+      dueCount: dueReviewCount,
+    };
+    setSessionSummary(summary);
+  }, [
+    dueReviewCount,
+    sessionAccuracy,
+    sessionState.correctCount,
+    sessionState.extractedCount,
+    sessionState.incorrectCount,
+    sessionState.sessionId,
+    sessionState.startedAt,
+    sessionStudiedCount,
+    setSessionSummary,
+    sessionAttemptCount,
+    words.length,
+  ]);
+
   const clearWordSet = () => {
     setWords([]);
+    setSessionState(createSessionState(0));
+    setSessionSummary(null);
     setCurrentIndex(0);
     setFlipped(false);
   };
@@ -224,6 +287,7 @@ export function FlashcardsPage() {
     if (!word || currentWordIndex < 0) return;
     const nowTs = Date.now();
     const isCorrect = nextStatus === 'mastered';
+    const reviewKey = `${word.word}-${currentWordIndex}`;
     const nextReviewAt = nextStatus === 'mastered'
       ? nowTs + MASTERED_REVIEW_INTERVAL_MS
       : nextStatus === 'reviewing'
@@ -235,6 +299,12 @@ export function FlashcardsPage() {
         ? updateWordPerformance(item, isCorrect, nextStatus, nextReviewAt)
         : item
     )));
+    setSessionState(prev => ({
+      ...prev,
+      reviewedKeys: prev.reviewedKeys.includes(reviewKey) ? prev.reviewedKeys : [...prev.reviewedKeys, reviewKey],
+      correctCount: prev.correctCount + (isCorrect ? 1 : 0),
+      incorrectCount: prev.incorrectCount + (isCorrect ? 0 : 1),
+    }));
     toast(`已标记为${STATUS_LABEL[nextStatus]}`, 'info');
   };
 
@@ -459,6 +529,20 @@ export function FlashcardsPage() {
             <>
               <p className="typo-body-sm text-muted-foreground mb-2">
                 当前词卡集合共 <span className="font-semibold text-foreground">{words.length}</span> 个单词，待复习 <span className="font-semibold text-foreground">{dueReviewCount}</span> 个。
+              </p>
+              <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  当次学习量 <span className="font-semibold text-foreground">{sessionStudiedCount}</span>
+                </span>
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  当次正确率 <span className="font-semibold text-foreground">{sessionAccuracy}%</span>
+                </span>
+                <span className="rounded-lg border border-border/60 bg-muted/30 px-2.5 py-1.5 text-muted-foreground">
+                  待复习量 <span className="font-semibold text-foreground">{dueReviewCount}</span>
+                </span>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                当次判定 <span className="font-semibold text-foreground">{sessionAttemptCount}</span> 次（掌握判定记为正确）。
               </p>
               <div className="mb-3 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">新词 {statusSummary.new}</span>

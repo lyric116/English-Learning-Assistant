@@ -1,5 +1,35 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcard Session Stats + Achievements Sharing (`P2-F-05`)
+
+### `client/src/types/index.ts`
+- Role: shared domain type boundary.
+- Changes:
+  - added `FlashcardSessionSummary` contract for cross-page flashcard session metrics
+  - standardizes fields used in flashcards runtime and achievements/report inputs
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard session runtime + metric producer.
+- Changes:
+  - added session-state tracker (`sessionId/startedAt/extractedCount/reviewedKeys/correct/incorrect`)
+  - derives required metrics:
+    - `当次学习量` (`studiedCount`)
+    - `当次正确率` (`accuracy`)
+    - `待复习量` (`dueCount`)
+  - persists summary to localStorage key `flashcardSessionSummary`
+  - clears summary on empty session reset to prevent stale data reuse
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: report/history consumer for cross-module learning data.
+- Changes:
+  - reads and renders latest `flashcardSessionSummary` in history section
+  - extends report payload (`learningData`) with flashcard session summary
+  - updates share-text generator to include flashcard session metrics when present
+  - report gate (`hasData`) now recognizes session summary as valid data source
+- Architectural impact:
+  - flashcard progress is now shareable across module boundaries without server-side persistence
+  - report generation can reason over both aggregate flashcard set and the latest study session snapshot
+
 ## Update 2026-02-25: Flashcard Review Queue Strategy (`P2-F-04`)
 
 ### `client/src/pages/FlashcardsPage.tsx`

@@ -55,6 +55,18 @@ export interface TestResult {
   readingTitle: string;
 }
 
+export interface FlashcardSessionSummary {
+  sessionId: string;
+  startedAt: string;
+  updatedAt: string;
+  extractedCount: number;
+  studiedCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracy: number;
+  dueCount: number;
+}
+
 // AI config
 export interface AIConfig {
   apiKey: string;

@@ -1,5 +1,28 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-05-session-stats-share)
+
+### Completed
+- Completed `P2-F-05` (flashcard session statistics + achievements sharing).
+- Flashcards module:
+  - added session summary model (`FlashcardSessionSummary`) and localStorage key `flashcardSessionSummary`
+  - tracks current-session `学习量/正确率/待复习量` from tri-state operations
+  - resets/clears summary when flashcard set is cleared to avoid stale carry-over
+  - history panel now explicitly shows required metrics (`当次学习量/当次正确率/待复习量`)
+- Achievements module:
+  - reads and displays latest flashcard session summary in history zone
+  - includes `flashcardSessionSummary` in report generation payload (`learningData`)
+  - extends share text with flashcard session metrics when available
+  - `hasData` now treats flashcard session summary as valid report input
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-F-05` is complete; flashcard session stats are now persisted and consumable by achievements/report flow.
+- Next step is `P2-F-06` (flashcard full regression checklist).
+
 ## 2026-02-25 (complete/p2-f-04-review-queue-priority)
 
 ### Completed

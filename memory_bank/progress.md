@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-q-06-quiz-regression)
+
+### Completed
+- Completed `P2-Q-06` (测验模块回归测试).
+- Added regression artifact: `code/quiz_regression_checklist.md`.
+- Regression scope includes:
+  - 参数配置与请求契约
+  - 普通出题与错题重练
+  - 限时倒计时/自动交卷/提前交卷
+  - 判分与解析展示一致性
+  - 错题本写入与入口联动
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-Q-06` is complete; quiz phase (`P2-Q-01` ~ `P2-Q-06`) is now fully closed.
+- Next step is `P2-A-01` (成就报告模板扩展).
+
 ## 2026-02-25 (complete/p2-q-05-scoring-feedback-unification)
 
 ### Completed

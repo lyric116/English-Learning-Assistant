@@ -1,5 +1,23 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Quiz Regression Closure (`P2-Q-06`)
+
+### `code/quiz_regression_checklist.md`
+- Role: quiz module regression execution record.
+- Scope captured:
+  - generation parameter contract
+  - normal quiz + wrong-retry flows
+  - timed submit behavior
+  - scoring/explanation consistency
+  - wrong-book write-back linkage
+- Gate evidence:
+  - `cd server && npm run build`
+  - `cd client && npm run lint`
+  - `cd client && npm run build`
+
+### Reliability Impact
+- Quiz phase now has a formal closure artifact chain and can be regression-checked against a single baseline checklist.
+
 ## Update 2026-02-25: Quiz Scoring & Feedback Unification (`P2-Q-05`)
 
 ### `client/src/pages/QuizPage.tsx`

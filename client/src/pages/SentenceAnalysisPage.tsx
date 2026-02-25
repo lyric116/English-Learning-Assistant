@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Textarea';
@@ -82,6 +82,10 @@ function toObjectArray(value: unknown): Record<string, unknown>[] {
   return value.filter(isRecord);
 }
 
+function normalizeToken(value: string): string {
+  return value.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '').toLowerCase();
+}
+
 function isSentenceAnalysisV2(value: unknown): value is SentenceAnalysis {
   if (!isRecord(value)) return false;
   const words = value.words;
@@ -162,9 +166,28 @@ export function SentenceAnalysisPage() {
   const [result, setResult] = useState<SentenceAnalysis | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
+  const [activeWordKey, setActiveWordKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
   const { toast } = useToast();
+
+  const wordLookup = useMemo(() => {
+    const map = new Map<string, SentenceAnalysis['words'][number]>();
+    if (!result) return map;
+    result.words.forEach(item => {
+      const wordKey = normalizeToken(item.text);
+      if (wordKey && !map.has(wordKey)) map.set(wordKey, item);
+      const lemmaKey = normalizeToken(item.lemma);
+      if (lemmaKey && !map.has(lemmaKey)) map.set(lemmaKey, item);
+    });
+    return map;
+  }, [result]);
+
+  const sentenceTokens = useMemo(
+    () => input.split(/(\s+)/).filter(token => token.length > 0),
+    [input],
+  );
+  const activeWordInfo = activeWordKey ? wordLookup.get(activeWordKey) ?? null : null;
 
   useEffect(() => {
     const hasLegacy = history.some(item => !isSentenceAnalysisV2(item.result));
@@ -181,6 +204,7 @@ export function SentenceAnalysisPage() {
     setLoading(true);
     setResult(null);
     setActiveTooltip(null);
+    setActiveWordKey(null);
     try {
       const data = await api.sentence.analyze(input);
       const normalized = normalizeSentenceAnalysis(data);
@@ -212,12 +236,14 @@ export function SentenceAnalysisPage() {
     setInput(record.sentence);
     setResult(normalizeSentenceAnalysis(record.result));
     setActiveTooltip(null);
+    setActiveWordKey(null);
   };
 
   const clearCurrent = () => {
     setInput('');
     setResult(null);
     setActiveTooltip(null);
+    setActiveWordKey(null);
     setErrorMessage('');
   };
 
@@ -307,9 +333,60 @@ export function SentenceAnalysisPage() {
               </div>
               <div className="relative bg-muted/50 rounded-lg p-5 border border-border/30">
                 <span className="absolute top-2 left-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
-                <p className="text-xl leading-relaxed font-serif pl-5 pr-5">{input}</p>
+                <p className="text-xl leading-relaxed font-serif pl-5 pr-5">
+                  {sentenceTokens.map((token, i) => {
+                    if (/^\s+$/.test(token)) {
+                      return <span key={`space-${i}`}>{token}</span>;
+                    }
+                    const tokenKey = normalizeToken(token);
+                    const matchedWord = tokenKey ? wordLookup.get(tokenKey) : null;
+                    if (!matchedWord) {
+                      return <span key={`token-${i}`}>{token}</span>;
+                    }
+                    return (
+                      <button
+                        key={`token-${i}`}
+                        type="button"
+                        onMouseEnter={() => setActiveWordKey(tokenKey)}
+                        onClick={() => setActiveWordKey(prev => (prev === tokenKey ? null : tokenKey))}
+                        className={cn(
+                          'inline rounded-md px-0.5 transition-colors',
+                          activeWordKey === tokenKey
+                            ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/45 dark:text-sky-300'
+                            : 'hover:bg-sky-100/70 hover:text-sky-700 dark:hover:bg-sky-900/35 dark:hover:text-sky-300',
+                        )}
+                      >
+                        {token}
+                      </button>
+                    );
+                  })}
+                </p>
                 <span className="absolute bottom-1 right-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
               </div>
+              {result.words.length > 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">悬停或点击高亮词汇，可查看词义、词性和句中作用。</p>
+              )}
+              {activeWordInfo && (
+                <div className="analysis-item mt-4" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold font-serif text-base">{activeWordInfo.text || '-'}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        词元: {activeWordInfo.lemma || '-'} · 词性: {activeWordInfo.partOfSpeech || '未标注'}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">{activeWordInfo.meaning || '未返回该词解释'}</p>
+                      {activeWordInfo.role && <p className="text-xs text-muted-foreground mt-1.5">句中作用: {activeWordInfo.role}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      className="tap-target p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
+                      onClick={() => setActiveWordKey(null)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
               {result.structure && (
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div className="analysis-item" style={{ '--item-color': '#3b82f6' } as React.CSSProperties}>

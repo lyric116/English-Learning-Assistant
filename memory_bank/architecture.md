@@ -1,5 +1,18 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Sentence Word Hover Panel (`P2-S-02`)
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: sentence analysis interaction surface.
+- Changes:
+  - added token-normalization utility (`normalizeToken`) and tokenized sentence rendering
+  - sentence text now contains interactive tokens (hover/click) mapped to normalized word data
+  - introduced `activeWordKey` state + closable detail panel for per-word explanation
+  - detail panel exposes `meaning`, `partOfSpeech`, `role` and supports manual close
+- Reliability impact:
+  - punctuation/case variance no longer breaks per-word matching
+  - interaction works with both `text` and `lemma` lookup keys, reducing AI key mismatch risk.
+
 ## Update 2026-02-25: Sentence Contract Extension (`P2-S-01`)
 
 ### `client/src/types/index.ts`

@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-s-02-word-hover-panel)
+
+### Completed
+- Completed `P2-S-02` (逐词悬停/点击解释交互).
+- `SentenceAnalysisPage` now supports token-level interaction inside the sentence display:
+  - tokenized sentence text renders clickable/hoverable highlighted words
+  - matched words open an inline explanation panel with:
+    - 词义（meaning）
+    - 词性（partOfSpeech）
+    - 句中作用（role）
+  - explanation panel supports explicit close action
+- Matching uses normalized token lookup (word + lemma fallback), so punctuation/case differences no longer block interaction.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-S-02` is complete with stable word-level reveal interaction in sentence result view.
+- Next step is `P2-S-03` (短语高亮与语法说明联动).
+
 ## 2026-02-25 (complete/p2-s-01-sentence-contract-extension)
 
 ### Completed

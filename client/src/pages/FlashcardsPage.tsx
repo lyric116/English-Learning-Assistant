@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
@@ -120,15 +120,6 @@ export function FlashcardsPage() {
     }
   };
 
-  const goTo = useCallback((dir: -1 | 1) => {
-    setCurrentIndex(i => {
-      const next = i + dir;
-      if (next < 0 || next >= words.length) return i;
-      return next;
-    });
-    setFlipped(false);
-  }, [words.length]);
-
   useEffect(() => {
     const hasLegacyData = words.some(word => !isWordModelV2(word as RawWord));
     if (!hasLegacyData) return;
@@ -136,9 +127,51 @@ export function FlashcardsPage() {
     setWords(words.map(word => normalizeWord(word as RawWord, now)));
   }, [words, setWords]);
 
+  const queue = useMemo(() => {
+    const nowTs = Date.now();
+    const statusOrder: Record<WordLearningStatus, number> = { reviewing: 0, new: 1, mastered: 2 };
+    return words
+      .map((item, index) => ({
+        index,
+        word: item,
+        isDue: item.nextReviewAt <= nowTs && item.learningStatus !== 'mastered',
+      }))
+      .sort((a, b) => {
+        if (a.isDue !== b.isDue) return a.isDue ? -1 : 1;
+        const statusDiff = statusOrder[a.word.learningStatus] - statusOrder[b.word.learningStatus];
+        if (statusDiff !== 0) return statusDiff;
+        if (a.word.nextReviewAt !== b.word.nextReviewAt) return a.word.nextReviewAt - b.word.nextReviewAt;
+        return a.index - b.index;
+      });
+  }, [words]);
+
+  const queueLength = queue.length;
+  const queueItem = queue[currentIndex];
+  const word = queueItem?.word;
+  const currentWordIndex = queueItem?.index ?? -1;
+
+  const goTo = useCallback((dir: -1 | 1) => {
+    setCurrentIndex(i => {
+      const next = i + dir;
+      if (next < 0 || next >= queueLength) return i;
+      return next;
+    });
+    setFlipped(false);
+  }, [queueLength]);
+
+  useEffect(() => {
+    if (queueLength === 0) {
+      if (currentIndex !== 0) setCurrentIndex(0);
+      return;
+    }
+    if (currentIndex >= queueLength) {
+      setCurrentIndex(queueLength - 1);
+    }
+  }, [currentIndex, queueLength]);
+
   // Keyboard shortcuts
   useEffect(() => {
-    if (words.length === 0) return;
+    if (queueLength === 0) return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
       switch (e.key) {
@@ -150,7 +183,7 @@ export function FlashcardsPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [goTo, words.length]);
+  }, [goTo, queueLength]);
 
   // Touch swipe
   const onTouchStart = (e: React.TouchEvent) => {
@@ -175,21 +208,20 @@ export function FlashcardsPage() {
     }
   }, [currentIndex]);
 
-  const word = words[currentIndex];
-  const progress = words.length > 0 ? ((currentIndex + 1) / words.length) * 100 : 0;
+  const progress = queueLength > 0 ? ((currentIndex + 1) / queueLength) * 100 : 0;
   const now = Date.now();
   const statusSummary = words.reduce<Record<WordLearningStatus, number>>((acc, item) => {
     acc[item.learningStatus] += 1;
     return acc;
   }, { new: 0, reviewing: 0, mastered: 0 });
-  const dueReviewCount = words.filter(item => item.nextReviewAt <= now).length;
+  const dueReviewCount = words.filter(item => item.nextReviewAt <= now && item.learningStatus !== 'mastered').length;
   const clearWordSet = () => {
     setWords([]);
     setCurrentIndex(0);
     setFlipped(false);
   };
   const markCurrentWord = (nextStatus: WordLearningStatus) => {
-    if (!word) return;
+    if (!word || currentWordIndex < 0) return;
     const nowTs = Date.now();
     const isCorrect = nextStatus === 'mastered';
     const nextReviewAt = nextStatus === 'mastered'
@@ -199,7 +231,7 @@ export function FlashcardsPage() {
         : nowTs + NEW_WORD_REVIEW_INTERVAL_MS;
 
     setWords(prev => prev.map((item, index) => (
-      index === currentIndex
+      index === currentWordIndex
         ? updateWordPerformance(item, isCorrect, nextStatus, nextReviewAt)
         : item
     )));
@@ -262,7 +294,7 @@ export function FlashcardsPage() {
         index={1}
         type="result"
         title="闪卡学习结果"
-        description="翻转查看释义、词源和例句，支持键盘与手势切换。"
+        description="翻转查看释义、词源和例句，按“到期复习优先”队列排序。"
       >
         {loading && <LoadingSpinner text="AI 正在分析文本并提取单词..." />}
 
@@ -274,7 +306,7 @@ export function FlashcardsPage() {
           />
         )}
 
-        {words.length > 0 && !loading && word && (
+        {queueLength > 0 && !loading && word && (
           <div className="flex flex-col items-center animate-soft-pop">
             <div className="relative w-full flex justify-center mb-6" style={{ maxWidth: 520 }}>
               <button
@@ -378,7 +410,7 @@ export function FlashcardsPage() {
               <button
                 className="flashcard-nav-arrow right"
                 onClick={() => goTo(1)}
-                disabled={currentIndex === words.length - 1}
+                disabled={currentIndex === queueLength - 1}
                 aria-label="下一张"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -387,18 +419,18 @@ export function FlashcardsPage() {
 
             <div className="w-full mb-8" style={{ maxWidth: 520 }}>
               <div className="flashcard-progress-track">
-                <div className="flashcard-progress-fill" style={{ width: `${progress}%` }} />
+              <div className="flashcard-progress-fill" style={{ width: `${progress}%` }} />
               </div>
               <p className="text-center text-xs text-muted-foreground mt-2 tabular-nums">
-                {currentIndex + 1} / {words.length}
+                {currentIndex + 1} / {queueLength}
               </p>
             </div>
 
             <div className="w-full" style={{ maxWidth: 520 }}>
               <div ref={wordListRef} className="flashcard-wordlist">
-                {words.map((w, i) => (
+                {queue.map((item, i) => (
                   <button
-                    key={w.word}
+                    key={`${item.word.word}-${item.index}`}
                     onClick={() => { setCurrentIndex(i); setFlipped(false); }}
                     className={cn(
                       'shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap',
@@ -407,7 +439,7 @@ export function FlashcardsPage() {
                         : 'bg-muted text-muted-foreground hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-300',
                     )}
                   >
-                    {w.word}
+                    {item.word.word}
                   </button>
                 ))}
               </div>

@@ -1,5 +1,21 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcard Review Queue Strategy (`P2-F-04`)
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard session queue orchestrator.
+- Changes:
+  - introduced derived queue layer over stored flashcards
+  - queue sort strategy:
+    - due-review first
+    - status priority (`reviewing -> new -> mastered`)
+    - earlier `nextReviewAt` first
+  - navigation/progress/chip-list now read from queue order
+  - state writes still target original storage index through queue mapping
+- Reliability impact:
+  - visual order can change by priority without breaking update correctness
+  - enables future spaced-repetition scheduling without mutating persisted array order directly
+
 ## Update 2026-02-25: Flashcard Tri-State Operations (`P2-F-03`)
 
 ### `client/src/pages/FlashcardsPage.tsx`

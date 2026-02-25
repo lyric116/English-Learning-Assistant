@@ -1,5 +1,28 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-04-review-queue-priority)
+
+### Completed
+- Completed `P2-F-04` (review queue strategy).
+- Implemented queue derivation in `FlashcardsPage`:
+  - sorts by `isDue` (due review first)
+  - then by status priority (`reviewing -> new -> mastered`)
+  - then by `nextReviewAt` time
+- Navigation and rendering now consume queue order instead of raw array order:
+  - left/right navigation, progress, and word chip list reflect prioritized queue
+  - queue keeps index mapping back to original storage array for safe updates
+- Status action updates remain stable after queue sorting:
+  - mark actions update underlying source word by mapped index
+  - avoids state-write mismatch between displayed order and storage order
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-F-04` is complete; flashcard browsing now prioritizes due-review items by design.
+- Next step is `P2-F-05` (flashcard session statistics and sharing to achievements).
+
 ## 2026-02-25 (complete/p2-f-03-flashcard-state-actions)
 
 ### Completed

@@ -274,6 +274,56 @@ function buildPersonalizedSuggestions(args: {
   return Array.from(new Set(tips)).slice(0, 5);
 }
 
+function buildStructuredShareContent(args: {
+  report: LearningReport;
+  trendMetrics: TrendMetric[];
+  personalizedSuggestions: string[];
+  flashcardSessionSummary: FlashcardSessionSummary | null;
+  readingWrongCount: number;
+  vocabularyWrongCount: number;
+}): string {
+  const { report, trendMetrics, personalizedSuggestions, flashcardSessionSummary, readingWrongCount, vocabularyWrongCount } = args;
+
+  const keyMetrics = [
+    `学习时长 ${report.timeStats.totalHours}h（日均 ${report.timeStats.averageDaily}h）`,
+    `词汇 学习 ${report.vocabulary.learned} / 掌握 ${report.vocabulary.mastered} / 待复习 ${report.vocabulary.needReview}`,
+    `阅读 ${report.reading.articles} 篇（主题：${report.reading.topTopics.join('、') || '暂无'}）`,
+    `测验 ${report.tests.completed} 次（平均分 ${report.tests.averageScore}）`,
+    `错题本 阅读 ${readingWrongCount} 题 / 词汇 ${vocabularyWrongCount} 题`,
+  ];
+
+  if (flashcardSessionSummary) {
+    keyMetrics.push(`最近闪卡会话 学习 ${flashcardSessionSummary.studiedCount} 词（正确率 ${flashcardSessionSummary.accuracy}%）`);
+  }
+
+  const trendLines = trendMetrics.map(metric => {
+    const delta = Math.abs(metric.current - metric.previous);
+    const deltaFixed = Number.isInteger(delta) ? delta.toFixed(0) : delta.toFixed(1);
+    const deltaText = delta === 0 ? '持平' : `${metric.trend === 'up' ? '+' : '-'}${deltaFixed}${metric.unit}`;
+    const trendText = metric.trend === 'up' ? '上升' : metric.trend === 'down' ? '下降' : '稳定';
+    return `${metric.label}: ${formatMetricValue(metric)}（${trendText}，${deltaText}）`;
+  });
+
+  const actionItems = personalizedSuggestions.slice(0, 3);
+
+  return [
+    `【${report.title}】`,
+    `周期：${report.period}`,
+    '',
+    '摘要：',
+    report.summary,
+    '',
+    '关键指标：',
+    ...keyMetrics.map(line => `- ${line}`),
+    '',
+    '趋势概览：',
+    ...trendLines.map(line => `- ${line}`),
+    '',
+    '下一步行动：',
+    ...actionItems.map((line, index) => `${index + 1}. ${line}`),
+  ].join('\n');
+}
+
 export function AchievementsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -329,16 +379,43 @@ export function AchievementsPage() {
     }
   };
 
-  const copyShareLink = () => {
-    const flashcardLine = flashcardSessionSummary
-      ? `🃏 闪卡会话: 学习${flashcardSessionSummary.studiedCount}词 · 正确率${flashcardSessionSummary.accuracy}% · 待复习${flashcardSessionSummary.dueCount}`
-      : '';
-    const text = report
-      ? `📊 ${report.title}\n${report.summary}\n✅ 词汇: ${report.vocabulary.learned} | 📖 阅读: ${report.reading.articles}篇 | 🎯 测试: ${report.tests.averageScore}分${flashcardLine ? `\n${flashcardLine}` : ''}`
-      : '';
-    navigator.clipboard.writeText(text).then(() => {
+  const personalizedSuggestions = useMemo(
+    () => buildPersonalizedSuggestions({
+      trendMetrics,
+      report,
+      selectedType,
+      wrongQuestionBook,
+      flashcardSessionSummary,
+    }),
+    [trendMetrics, report, selectedType, wrongQuestionBook, flashcardSessionSummary],
+  );
+
+  const shareContent = useMemo(
+    () => (report ? buildStructuredShareContent({
+      report,
+      trendMetrics,
+      personalizedSuggestions,
+      flashcardSessionSummary,
+      readingWrongCount,
+      vocabularyWrongCount,
+    }) : ''),
+    [
+      report,
+      trendMetrics,
+      personalizedSuggestions,
+      flashcardSessionSummary,
+      readingWrongCount,
+      vocabularyWrongCount,
+    ],
+  );
+
+  const copyShareContent = () => {
+    if (!shareContent) return;
+    navigator.clipboard.writeText(shareContent).then(() => {
       toast('已复制到剪贴板', 'success');
       setShowShare(false);
+    }).catch(() => {
+      toast('复制失败，请手动复制内容', 'error');
     });
   };
 
@@ -351,16 +428,6 @@ export function AchievementsPage() {
   ];
 
   const statColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
-  const personalizedSuggestions = useMemo(
-    () => buildPersonalizedSuggestions({
-      trendMetrics,
-      report,
-      selectedType,
-      wrongQuestionBook,
-      flashcardSessionSummary,
-    }),
-    [trendMetrics, report, selectedType, wrongQuestionBook, flashcardSessionSummary],
-  );
 
   const loadHistoryReport = (saved: LearningReport & { timestamp?: number }) => {
     const { timestamp, ...reportData } = saved;
@@ -747,25 +814,22 @@ export function AchievementsPage() {
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-muted-foreground text-sm mb-4">选择分享方式：</p>
-          <div className="grid grid-cols-4 gap-3 mb-6">
-            {[
-              { label: '微信', color: 'bg-green-500', icon: '💬' },
-              { label: 'X', color: 'bg-black', icon: '𝕏' },
-              { label: '微博', color: 'bg-red-500', icon: '📢' },
-              { label: '复制', color: 'bg-gray-600', icon: '🔗', action: copyShareLink },
-            ].map(item => (
-              <button
-                key={item.label}
-                onClick={item.action || (() => toast('分享功能开发中', 'info'))}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-muted transition"
-              >
-                <span className={cn('w-12 h-12 rounded-full flex items-center justify-center text-xl text-white', item.color)}>
-                  {item.icon}
-                </span>
-                <span className="text-xs">{item.label}</span>
-              </button>
-            ))}
+          <p className="text-muted-foreground text-sm mb-3">
+            以下内容包含标题、摘要、关键指标与行动项，可直接复制后粘贴到外部平台。
+          </p>
+          <textarea
+            readOnly
+            value={shareContent}
+            className="w-full min-h-[220px] rounded-lg border border-border bg-muted/20 p-3 text-xs leading-relaxed mb-4"
+          />
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button size="sm" onClick={copyShareContent}>
+              <Share2 className="h-4 w-4 mr-1.5" />
+              复制结构化内容
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowShare(false)}>
+              关闭
+            </Button>
           </div>
           <div className="bg-muted rounded-lg p-3 text-sm">
             <p className="font-medium mb-1">{report.title}</p>

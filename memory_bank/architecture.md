@@ -1,5 +1,24 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Structured Share Upgrade (`P2-A-03`)
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: achievements share-content composer.
+- Changes:
+  - introduced structured share-content builder that composes:
+    - report title and period
+    - summary paragraph
+    - key metrics block
+    - trend snapshot block
+    - top action recommendations
+  - share dialog now includes:
+    - read-only structured preview textarea
+    - clipboard copy action with explicit success/failure feedback
+  - share content now depends on deterministic local metrics and recommendation pipeline, not only AI summary sentence
+
+### Architectural Impact
+- Share output moved from free-form text to stable structured payload, improving cross-platform readability and reducing information loss when pasted outside the app.
+
 ## Update 2026-02-25: Trend Metrics & Personalized Suggestions (`P2-A-02`)
 
 ### `client/src/pages/AchievementsPage.tsx`

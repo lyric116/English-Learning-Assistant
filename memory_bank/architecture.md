@@ -1,5 +1,45 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Feedback System Unification (`P1-06`)
+
+### `client/src/components/ui/LoadingSpinner.tsx`
+- Role: canonical loading-state renderer.
+- Changes:
+  - moved to shared panel-like loading surface with consistent spacing/copy hierarchy
+
+### `client/src/components/ui/EmptyState.tsx`
+- Role: canonical no-data/no-result renderer.
+- Changes:
+  - standardized empty-state container surface and icon/body text treatment
+
+### `client/src/components/ui/Toast.tsx`
+- Role: global transient feedback channel.
+- Changes:
+  - switched from solid blocks to semantic bordered tones with light/dark parity
+  - improved responsive container spacing and dismiss button consistency
+
+### `client/src/components/ui/Skeleton.tsx`
+- Role: shared placeholder primitive.
+- Changes:
+  - unified muted shimmer baseline for cross-page consistency
+
+### `client/src/components/ui/FeedbackAlert.tsx`
+- Role: reusable inline status/error prompt component.
+- Changes:
+  - supports `success/error/warning/info` tones
+  - provides dismissible inline message surface with semantic role mapping
+
+### `client/src/pages/FlashcardsPage.tsx`
+### `client/src/pages/SentenceAnalysisPage.tsx`
+### `client/src/pages/ReadingPage.tsx`
+### `client/src/pages/QuizPage.tsx`
+### `client/src/pages/AchievementsPage.tsx`
+- Role: five business modules consuming unified feedback system.
+- Changes:
+  - each page now stores request error message state and renders `FeedbackAlert` near top-level content
+  - preserves existing toast behavior while adding persistent on-page error visibility
+  - keeps loading/empty states on shared updated primitives
+
 ## Update 2026-02-25: Input System Unification (`P1-05`)
 
 ### `client/src/components/ui/form-control.ts`

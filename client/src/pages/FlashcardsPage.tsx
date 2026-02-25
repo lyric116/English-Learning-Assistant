@@ -5,6 +5,7 @@ import { Select } from '@/components/ui/Select';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useTts } from '@/hooks/use-tts';
 import { useToast } from '@/components/ui/toast-context';
@@ -19,6 +20,7 @@ export function FlashcardsPage() {
   const [inputText, setInputText] = useState('');
   const [level, setLevel] = useState('all');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const { speak } = useTts();
@@ -31,6 +33,7 @@ export function FlashcardsPage() {
 
   const handleExtract = async () => {
     if (!inputText.trim()) return;
+    setErrorMessage('');
     setLoading(true);
     try {
       const result = await api.flashcards.extract(inputText, 10, level) as Word[];
@@ -41,9 +44,12 @@ export function FlashcardsPage() {
       setWords(result);
       setCurrentIndex(0);
       setFlipped(false);
+      setErrorMessage('');
       toast(`成功提取 ${result.length} 个单词`, 'success');
     } catch (err) {
-      toast(`提取失败: ${(err as Error).message}`, 'error');
+      const message = (err as Error).message;
+      setErrorMessage(message);
+      toast(`提取失败: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -103,6 +109,14 @@ export function FlashcardsPage() {
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
+      {errorMessage && (
+        <FeedbackAlert
+          type="error"
+          message={errorMessage}
+          onClose={() => setErrorMessage('')}
+          className="mb-6"
+        />
+      )}
 
       {/* Input area */}
       <Card className="mb-10 ds-glass-panel">

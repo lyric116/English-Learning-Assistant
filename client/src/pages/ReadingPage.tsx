@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/Select';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
 import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { useTts } from '@/hooks/use-tts';
@@ -26,6 +27,7 @@ export function ReadingPage() {
   const [inputText, setInputText] = useState('');
   const [language, setLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [reading, setReading] = useState<ReadingContent | null>(null);
   const [viewMode, setViewMode] = useState<'alternate' | 'parallel'>('alternate');
   const [, setHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
@@ -37,16 +39,20 @@ export function ReadingPage() {
 
   const generate = async () => {
     if (!inputText.trim()) return;
+    setErrorMessage('');
     setLoading(true);
     try {
       const result = await api.reading.generate(inputText, language) as ReadingContent;
       setReading(result);
+      setErrorMessage('');
       const withTimestamp = { ...result, timestamp: Date.now() };
       setQuizReadingContext(withTimestamp);
       setHistory(prev => [withTimestamp, ...prev].slice(0, 10));
       toast('双语内容生成成功', 'success');
     } catch (err) {
-      toast(`生成失败: ${(err as Error).message}`, 'error');
+      const message = (err as Error).message;
+      setErrorMessage(message);
+      toast(`生成失败: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -86,6 +92,14 @@ export function ReadingPage() {
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
+      {errorMessage && (
+        <FeedbackAlert
+          type="error"
+          message={errorMessage}
+          onClose={() => setErrorMessage('')}
+          className="mb-6"
+        />
+      )}
 
       <Card className="mb-10">
         <div className="relative">

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
 import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
@@ -25,6 +26,7 @@ export function AchievementsPage() {
   const { toast } = useToast();
   const [selectedType, setSelectedType] = useState('weekly');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [report, setReport] = useState<LearningReport | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [flashcards] = useLocalStorage<Word[]>('flashcards', []);
@@ -39,15 +41,19 @@ export function AchievementsPage() {
       toast('暂无学习数据，请先完成一些学习活动', 'warning');
       return;
     }
+    setErrorMessage('');
     setLoading(true);
     try {
       const learningData = { flashcards, readingHistory, testHistory };
       const result = await api.report.generate(selectedType, learningData) as LearningReport;
       setReport(result);
+      setErrorMessage('');
       setReportHistory(prev => [{ ...result, timestamp: Date.now() }, ...prev].slice(0, 10));
       toast('学习报告生成成功', 'success');
     } catch (err) {
-      toast(`生成报告失败: ${(err as Error).message}`, 'error');
+      const message = (err as Error).message;
+      setErrorMessage(message);
+      toast(`生成报告失败: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -77,6 +83,14 @@ export function AchievementsPage() {
     <>
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
+      {errorMessage && (
+        <FeedbackAlert
+          type="error"
+          message={errorMessage}
+          onClose={() => setErrorMessage('')}
+          className="mb-6"
+        />
+      )}
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">

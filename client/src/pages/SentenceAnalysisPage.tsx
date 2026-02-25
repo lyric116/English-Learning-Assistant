@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Textarea';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
 import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
@@ -51,6 +52,7 @@ export function SentenceAnalysisPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SentenceAnalysis | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
@@ -58,6 +60,7 @@ export function SentenceAnalysisPage() {
 
   const analyze = async () => {
     if (!input.trim()) return;
+    setErrorMessage('');
     setLoading(true);
     setResult(null);
     setActiveTooltip(null);
@@ -70,7 +73,9 @@ export function SentenceAnalysisPage() {
       ].slice(0, 3));
       toast('分析完成', 'success');
     } catch (err) {
-      toast(`分析失败: ${(err as Error).message}`, 'error');
+      const message = (err as Error).message;
+      setErrorMessage(message);
+      toast(`分析失败: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -94,6 +99,14 @@ export function SentenceAnalysisPage() {
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
+      {errorMessage && (
+        <FeedbackAlert
+          type="error"
+          message={errorMessage}
+          onClose={() => setErrorMessage('')}
+          className="mb-6"
+        />
+      )}
 
       <Card className="mb-10">
         <div className="relative">

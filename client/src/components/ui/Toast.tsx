@@ -20,10 +20,10 @@ const icons: Record<ToastType, typeof Info> = {
 };
 
 const colors: Record<ToastType, string> = {
-  success: 'bg-green-600 text-white',
-  error: 'bg-red-600 text-white',
-  info: 'bg-primary-600 text-white',
-  warning: 'bg-yellow-500 text-white',
+  success: 'border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/35 dark:text-green-200',
+  error: 'border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/35 dark:text-red-200',
+  info: 'border-primary-300 bg-primary-50 text-primary-900 dark:border-primary-700 dark:bg-primary-950/35 dark:text-primary-200',
+  warning: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-200',
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -43,21 +43,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm" role="status" aria-live="polite">
+      <div className="fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2 px-3 sm:px-0" role="status" aria-live="polite">
         {toasts.map(t => {
           const Icon = icons[t.type];
           return (
             <div
               key={t.id}
               className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg',
+                'flex items-center gap-3 rounded-lg border px-4 py-3 shadow-md backdrop-blur-sm',
                 colors[t.type],
                 t.exiting ? 'toast-exit' : 'toast-enter',
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />
               <span className="text-sm font-medium flex-1">{t.message}</span>
-              <button onClick={() => removeToast(t.id)} className="shrink-0 hover:opacity-70">
+              <button onClick={() => removeToast(t.id)} className="shrink-0 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100">
                 <X className="h-4 w-4" />
               </button>
             </div>

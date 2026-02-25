@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FeedbackAlert } from '@/components/ui/FeedbackAlert';
 import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
@@ -26,6 +27,7 @@ export function QuizPage() {
 
   const [phase, setPhase] = useState<Phase>('select');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [qIndex, setQIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
@@ -49,6 +51,7 @@ export function QuizPage() {
       navigate('/reading');
       return;
     }
+    setErrorMessage('');
     setTestType(type);
     setLoading(true);
     try {
@@ -64,9 +67,12 @@ export function QuizPage() {
       setQIndex(0);
       setAnswered(false);
       setPhase('quiz');
+      setErrorMessage('');
       toast(`已生成 ${result.length} 道${type === 'reading' ? '阅读理解' : '词汇'}题`, 'success');
     } catch (err) {
-      toast(`生成测试题失败: ${(err as Error).message}`, 'error');
+      const message = (err as Error).message;
+      setErrorMessage(message);
+      toast(`生成测试题失败: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -132,6 +138,14 @@ export function QuizPage() {
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
+      {errorMessage && (
+        <FeedbackAlert
+          type="error"
+          message={errorMessage}
+          onClose={() => setErrorMessage('')}
+          className="mb-6"
+        />
+      )}
 
       {/* Selection phase */}
       {phase === 'select' && !loading && (

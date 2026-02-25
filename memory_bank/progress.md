@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-06-feedback-system-unification)
+
+### Completed
+- Completed `P1-06` (feedback component style unification).
+- Unified shared feedback primitives:
+  - `LoadingSpinner` updated to panel-style loading state
+  - `EmptyState` updated to standardized empty-surface style and copy spacing
+  - `Toast` updated to consistent bordered semantic tone style (success/error/info/warning)
+  - `Skeleton` updated to unified muted baseline style
+- Added reusable `FeedbackAlert` component for inline error/status messages.
+- Wired API error feedback into all five business modules:
+  - `FlashcardsPage`, `SentenceAnalysisPage`, `ReadingPage`, `QuizPage`, `AchievementsPage`
+  - each module now keeps local error state and renders dismissible inline error alert in addition to toast.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-06` is complete with consistent loading/empty/error/toast/skeleton feedback language.
+- Next step is `P1-07` (navigation and page skeleton refactor).
+
 ## 2026-02-25 (complete/p1-05-input-system-unification)
 
 ### Completed

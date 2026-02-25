@@ -243,7 +243,7 @@ export function SentenceAnalysisPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold tracking-wide opacity-60 mb-1">{comp.type}</p>
+                        <p className="text-xs font-bold tracking-wide text-muted-foreground mb-1">{comp.type}</p>
                         <p className="font-serif text-base italic text-foreground/90 mb-2">"{comp.text}"</p>
                         <p className="text-sm text-muted-foreground leading-relaxed">{comp.explanation}</p>
                       </div>

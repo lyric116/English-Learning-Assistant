@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-03-contrast-readability-audit)
+
+### Completed
+- Completed `P1-03` (contrast audit for light/dark readability).
+- Raised low-contrast key text in flashcards:
+  - front phonetic text from semi-transparent muted to readable muted color
+  - flip hint text from weak opacity to readable muted color
+  - back-side phonetic and progress counter from low-opacity muted to readable muted color
+- Raised low-contrast key text/icon hints on home + sentence analysis:
+  - home "coming soon" action text no longer uses reduced opacity
+  - home step-arrow separator icon uses stronger muted contrast
+  - sentence analysis detail label no longer uses opacity-based dimming
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-03` is completed with practical readability fixes on real user-facing pages.
+- Next step is `P1-04`.
+
 ## 2026-02-25 (complete/p1-02-typography-hierarchy)
 
 ### Completed

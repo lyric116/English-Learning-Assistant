@@ -1,5 +1,25 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Contrast Readability Audit (`P1-03`)
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: flashcard learning's primary readability surface (front/back card + progress indicator).
+- Changes:
+  - upgraded phonetic/hint/progress texts from low-opacity muted colors to readable muted colors
+  - kept hierarchy intact while removing weak-contrast text states that were hard to read in both themes
+
+### `client/src/pages/HomePage.tsx`
+- Role: entry hub for all learning modules and onboarding sequence.
+- Changes:
+  - "即将推出" action text now uses readable muted text without additional opacity dimming
+  - step-connector arrow icon contrast increased to remain visible on light/dark backgrounds
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: detailed grammar analysis output surface.
+- Changes:
+  - component detail label moved from opacity-dimmed text to readable muted text
+  - preserves visual hierarchy while reducing readability risk in dense analysis cards
+
 ## Update 2026-02-25: Typography Hierarchy (`P1-02`)
 
 ### `client/src/index.css`

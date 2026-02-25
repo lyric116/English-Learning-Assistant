@@ -176,7 +176,7 @@ export function FlashcardsPage() {
                         {word.word}
                       </p>
                       <div className="w-12 h-0.5 bg-primary-300/50 dark:bg-primary-600/50 rounded-full my-2" />
-                      <p className="text-lg text-muted-foreground/80 font-light tracking-wide">{word.phonetic}</p>
+                      <p className="text-lg text-muted-foreground font-light tracking-wide">{word.phonetic}</p>
                       <button
                         className="mt-3 p-3 rounded-full hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                         onClick={e => { e.stopPropagation(); speak(word.word); }}
@@ -184,7 +184,7 @@ export function FlashcardsPage() {
                       >
                         <Volume2 className="h-5 w-5 text-primary-400" />
                       </button>
-                      <p className="mt-auto text-xs text-muted-foreground/40 tracking-wider">
+                      <p className="mt-auto text-xs text-muted-foreground tracking-wider">
                         点击翻转 · ← → 切换 · 空格翻转
                       </p>
                     </div>
@@ -194,7 +194,7 @@ export function FlashcardsPage() {
                       <div className="flex items-center gap-3 mb-5">
                         <div className="flex-1 min-w-0">
                           <p className="text-2xl font-bold font-serif text-primary-700 dark:text-primary-400 truncate">{word.word}</p>
-                          <p className="text-sm text-muted-foreground/70 mt-0.5">{word.phonetic}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{word.phonetic}</p>
                         </div>
                         <button
                           className="shrink-0 p-2 rounded-full hover:bg-muted transition-colors"
@@ -250,7 +250,7 @@ export function FlashcardsPage() {
             <div className="flashcard-progress-track">
               <div className="flashcard-progress-fill" style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-center text-xs text-muted-foreground/60 mt-2 tabular-nums">
+            <p className="text-center text-xs text-muted-foreground mt-2 tabular-nums">
               {currentIndex + 1} / {words.length}
             </p>
           </div>

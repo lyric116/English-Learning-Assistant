@@ -107,7 +107,7 @@ export function HomePage() {
                 {f.action} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             ) : (
-              <span className="text-muted-foreground font-medium text-sm opacity-60">
+              <span className="text-muted-foreground font-medium text-sm">
                 {f.action} ⏳
               </span>
             )}
@@ -127,7 +127,7 @@ export function HomePage() {
               <h3 className="typo-h3 text-center mb-2">{s.title}</h3>
               <p className="text-muted-foreground text-center typo-body-sm">{s.desc}</p>
               {i < steps.length - 1 && (
-                <ArrowRight className="hidden lg:block absolute -right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/30" />
+                <ArrowRight className="hidden lg:block absolute -right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/60" />
               )}
             </div>
           ))}

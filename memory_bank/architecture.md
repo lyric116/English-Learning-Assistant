@@ -1,5 +1,24 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Flashcards Regression Closure (`P2-F-06`)
+
+### `code/flashcards_regression_checklist.md`
+- Role: flashcards module regression execution artifact.
+- Scope captured:
+  - extraction parameter/contract checks
+  - flip/navigation behavior checks
+  - tri-state state transition checks
+  - TTS trigger checks
+  - localStorage persistence checks (`flashcards`, `flashcardSessionSummary`)
+- Verification gate linkage:
+  - ties module regression sign-off to concrete command evidence:
+    - `cd client && npm run lint`
+    - `npm run build`
+
+### Reliability Impact
+- Flashcards step set (`P2-F-01` to `P2-F-06`) now has an explicit closure record.
+- Future regressions can diff against a single checklist artifact instead of scattered notes.
+
 ## Update 2026-02-25: Flashcard Session Stats + Achievements Sharing (`P2-F-05`)
 
 ### `client/src/types/index.ts`

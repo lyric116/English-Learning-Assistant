@@ -1,5 +1,25 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-f-06-flashcards-regression)
+
+### Completed
+- Completed `P2-F-06` (flashcards module regression pass).
+- Added regression checklist artifact: `code/flashcards_regression_checklist.md`.
+- Checklist covers required paths:
+  - 抽词参数与返回契约
+  - 翻卡与导航
+  - 三态状态更新
+  - 朗读触发
+  - 历史与会话统计持久化
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `npm run build` ✅（包含 `server` 与 `client` 构建）
+
+### Notes For Next Developer
+- `P2-F-06` is complete; flashcards phase (`P2-F-01` ~ `P2-F-06`) is now fully closed.
+- Next step is `P2-S-01` (sentence analysis model extension).
+
 ## 2026-02-25 (complete/p2-f-05-session-stats-share)
 
 ### Completed

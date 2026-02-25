@@ -18,7 +18,46 @@ import {
   ChevronDown, Trash2,
 } from 'lucide-react';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
-import type { ReadingContent, VocabItem } from '@/types';
+import type {
+  ReadingContent,
+  ReadingDifficulty,
+  ReadingGenerationConfig,
+  ReadingLanguage,
+  ReadingLength,
+  ReadingTopic,
+  VocabItem,
+} from '@/types';
+
+const TOPIC_LABELS: Record<ReadingTopic, string> = {
+  general: '综合',
+  work: '职场',
+  travel: '旅行',
+  technology: '科技',
+  culture: '文化',
+  education: '学习',
+};
+
+const DIFFICULTY_LABELS: Record<ReadingDifficulty, string> = {
+  easy: '基础',
+  medium: '进阶',
+  hard: '高阶',
+};
+
+const LENGTH_LABELS: Record<ReadingLength, string> = {
+  short: '短篇',
+  medium: '中篇',
+  long: '长篇',
+};
+
+const LANGUAGE_LABELS: Record<ReadingLanguage, string> = {
+  en: '英文 → 中文',
+  zh: '中文 → 英文',
+};
+
+const TOPIC_OPTIONS: ReadingTopic[] = ['general', 'work', 'travel', 'technology', 'culture', 'education'];
+const DIFFICULTY_OPTIONS: ReadingDifficulty[] = ['easy', 'medium', 'hard'];
+const LENGTH_OPTIONS: ReadingLength[] = ['short', 'medium', 'long'];
+const LANGUAGE_OPTIONS: ReadingLanguage[] = ['en', 'zh'];
 
 export function ReadingPage() {
   const quizContextKey = 'quizCurrentReading';
@@ -26,7 +65,10 @@ export function ReadingPage() {
   const { speak, speaking } = useTts();
   const { toast } = useToast();
   const [inputText, setInputText] = useState('');
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState<ReadingLanguage>('en');
+  const [topic, setTopic] = useState<ReadingTopic>('general');
+  const [difficulty, setDifficulty] = useState<ReadingDifficulty>('medium');
+  const [length, setLength] = useState<ReadingLength>('medium');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [reading, setReading] = useState<ReadingContent | null>(null);
@@ -40,13 +82,21 @@ export function ReadingPage() {
 
   const generate = async () => {
     if (!inputText.trim()) return;
+    if (!LANGUAGE_OPTIONS.includes(language)
+      || !TOPIC_OPTIONS.includes(topic)
+      || !DIFFICULTY_OPTIONS.includes(difficulty)
+      || !LENGTH_OPTIONS.includes(length)) {
+      toast('阅读参数无效，请重新选择后再试', 'warning');
+      return;
+    }
     setErrorMessage('');
     setLoading(true);
     try {
-      const result = await api.reading.generate(inputText, language) as ReadingContent;
-      setReading(result);
+      const config: ReadingGenerationConfig = { language, topic, difficulty, length };
+      const result = await api.reading.generate(inputText, config) as ReadingContent;
+      const withTimestamp = { ...result, timestamp: Date.now(), generationConfig: config };
+      setReading(withTimestamp);
       setErrorMessage('');
-      const withTimestamp = { ...result, timestamp: Date.now() };
       setQuizReadingContext(withTimestamp);
       setHistory(prev => [withTimestamp, ...prev].slice(0, 10));
       toast('双语内容生成成功', 'success');
@@ -106,7 +156,7 @@ export function ReadingPage() {
         index={0}
         type="input"
         title="输入阅读素材"
-        description="输入中英文文本并选择转换方向。"
+        description="输入素材并设置主题、难度、篇幅与语言方向。"
       >
         <Card>
           <div className="relative">
@@ -126,17 +176,36 @@ export function ReadingPage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-4">
-            <Select value={language} onChange={e => setLanguage(e.target.value)}>
+            <Select value={language} onChange={e => setLanguage(e.target.value as ReadingLanguage)}>
               <option value="en">英文 → 中文</option>
               <option value="zh">中文 → 英文</option>
+            </Select>
+            <Select value={topic} onChange={e => setTopic(e.target.value as ReadingTopic)}>
+              {TOPIC_OPTIONS.map(option => (
+                <option key={option} value={option}>{TOPIC_LABELS[option]}</option>
+              ))}
+            </Select>
+            <Select value={difficulty} onChange={e => setDifficulty(e.target.value as ReadingDifficulty)}>
+              {DIFFICULTY_OPTIONS.map(option => (
+                <option key={option} value={option}>{DIFFICULTY_LABELS[option]}</option>
+              ))}
+            </Select>
+            <Select value={length} onChange={e => setLength(e.target.value as ReadingLength)}>
+              {LENGTH_OPTIONS.map(option => (
+                <option key={option} value={option}>{LENGTH_LABELS[option]}</option>
+              ))}
             </Select>
             <Button onClick={generate} loading={loading} disabled={loading || !inputText.trim()}>
               <Sparkles className="h-4 w-4 mr-1.5" />
               生成双语内容
             </Button>
-            <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">
-              支持任意长度文本
-            </span>
+            <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">支持任意长度文本</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full bg-muted px-2.5 py-1">方向: {LANGUAGE_LABELS[language]}</span>
+            <span className="rounded-full bg-muted px-2.5 py-1">主题: {TOPIC_LABELS[topic]}</span>
+            <span className="rounded-full bg-muted px-2.5 py-1">难度: {DIFFICULTY_LABELS[difficulty]}</span>
+            <span className="rounded-full bg-muted px-2.5 py-1">篇幅: {LENGTH_LABELS[length]}</span>
           </div>
         </Card>
       </ModuleSection>
@@ -164,6 +233,22 @@ export function ReadingPage() {
                 <h2 className="typo-h2 mb-4 pb-3 border-b border-border/50 break-words">
                   {reading.title}
                 </h2>
+              )}
+              {reading.generationConfig && (
+                <div className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2.5 py-1">
+                    {LANGUAGE_LABELS[reading.generationConfig.language]}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">
+                    主题: {TOPIC_LABELS[reading.generationConfig.topic]}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">
+                    难度: {DIFFICULTY_LABELS[reading.generationConfig.difficulty]}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-1">
+                    篇幅: {LENGTH_LABELS[reading.generationConfig.length]}
+                  </span>
+                </div>
               )}
               {viewMode === 'alternate' ? (
                 <div className="space-y-4">

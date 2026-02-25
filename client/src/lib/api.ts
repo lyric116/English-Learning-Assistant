@@ -6,6 +6,16 @@ import { getAnonymousSessionId } from './session';
 const API_BASE = '/api/v1';
 const REQUEST_TIMEOUT_MS = 95_000;
 type FlashcardLevel = 'all' | 'cet4' | 'cet6' | 'advanced';
+type ReadingLanguage = 'en' | 'zh';
+type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
+type ReadingDifficulty = 'easy' | 'medium' | 'hard';
+type ReadingLength = 'short' | 'medium' | 'long';
+type ReadingGenerateOptions = {
+  language?: ReadingLanguage;
+  topic?: ReadingTopic;
+  difficulty?: ReadingDifficulty;
+  length?: ReadingLength;
+};
 
 function isAiRequest(url: string, method: string): boolean {
   return method === 'POST' && url !== '/health';
@@ -97,11 +107,15 @@ export const api = {
       }),
   },
   reading: {
-    generate: (text: string, language?: string) =>
-      request('/reading/generate', {
+    generate: (text: string, languageOrOptions?: ReadingLanguage | ReadingGenerateOptions) => {
+      const options = typeof languageOrOptions === 'string'
+        ? { language: languageOrOptions }
+        : (languageOrOptions ?? {});
+      return request('/reading/generate', {
         method: 'POST',
-        body: JSON.stringify({ text, language }),
-      }),
+        body: JSON.stringify({ text, ...options }),
+      });
+    },
   },
   quiz: {
     readingQuestions: (reading: string, questionCount?: number) =>

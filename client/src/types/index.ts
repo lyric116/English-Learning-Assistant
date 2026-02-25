@@ -71,6 +71,18 @@ export interface SentenceAnalysis {
 }
 
 // Reading content
+export type ReadingLanguage = 'en' | 'zh';
+export type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
+export type ReadingDifficulty = 'easy' | 'medium' | 'hard';
+export type ReadingLength = 'short' | 'medium' | 'long';
+
+export interface ReadingGenerationConfig {
+  language: ReadingLanguage;
+  topic: ReadingTopic;
+  difficulty: ReadingDifficulty;
+  length: ReadingLength;
+}
+
 export interface VocabItem {
   word: string;
   phonetic?: string;
@@ -84,6 +96,7 @@ export interface ReadingContent {
   vocabulary: VocabItem[];
   timestamp?: number;
   title?: string;
+  generationConfig?: ReadingGenerationConfig;
 }
 
 // Quiz

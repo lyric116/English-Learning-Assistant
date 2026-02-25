@@ -1,5 +1,39 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Reading Parameter Extension (`P2-R-01`)
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: reading-generation parameter entry and session viewer.
+- Changes:
+  - added generation controls for:
+    - language direction (`en/zh`)
+    - topic
+    - difficulty
+    - length
+  - validates selected options before request dispatch
+  - stores applied generation config in result/history (`generationConfig`)
+  - surfaces active config chips in input and result panels
+
+### `client/src/lib/api.ts`
+- Role: client request boundary for reading module.
+- Changes:
+  - `reading.generate` now supports structured options payload
+  - backward-compatible call form retained (`language` string still accepted)
+
+### `client/src/types/index.ts`
+- Role: shared domain model for reading data.
+- Changes:
+  - added reading config unions/types:
+    - `ReadingLanguage`
+    - `ReadingTopic`
+    - `ReadingDifficulty`
+    - `ReadingLength`
+    - `ReadingGenerationConfig`
+  - `ReadingContent` now can carry `generationConfig` metadata
+
+### Architectural Impact
+- Reading generation is no longer single-parameter; it now has a typed multi-parameter contract at the client boundary.
+
 ## Update 2026-02-25: Sentence Regression Closure (`P2-S-05`)
 
 ### `code/sentence_regression_checklist.md`

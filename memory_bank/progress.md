@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-r-01-reading-parameter-extension)
+
+### Completed
+- Completed `P2-R-01` (阅读生成参数扩展，前端侧).
+- Reading input panel now supports configurable params:
+  - `language`（中英方向）
+  - `topic`（主题）
+  - `difficulty`（难度）
+  - `length`（篇幅）
+- Request contract extended in client API:
+  - `api.reading.generate` now accepts options payload and forwards params in request body.
+- Reading result/history now carries generation config metadata (`generationConfig`) for replay and downstream usage.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-R-01` is complete on frontend and API-call layer.
+- Next step is `P2-R-02` (后端参数校验与生成规则同步).
+
 ## 2026-02-25 (complete/p2-s-05-sentence-regression)
 
 ### Completed

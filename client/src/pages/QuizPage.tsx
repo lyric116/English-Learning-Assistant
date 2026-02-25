@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ModuleSection } from '@/components/layout/ModuleSection';
 import {
   BookOpen, Type, ListChecks, RotateCcw,
   Trophy, ChevronRight, AlertTriangle, CheckCircle2, XCircle,
@@ -35,7 +36,7 @@ export function QuizPage() {
   const [testType, setTestType] = useState<'reading' | 'vocabulary'>('reading');
   const [showReview, setShowReview] = useState(false);
   const [storedReading, setStoredReading] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
-  const [, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
+  const [testHistory, setTestHistory] = useLocalStorage<TestResult[]>('testHistory', []);
   const currentReading = routeReading ?? storedReading;
   const restoredFromStorage = !routeReading && !!storedReading;
 
@@ -147,10 +148,13 @@ export function QuizPage() {
         />
       )}
 
-      {/* Selection phase */}
-      {phase === 'select' && !loading && (
-        <>
-          {!currentReading ? (
+      <ModuleSection
+        type="input"
+        title="选择测试输入"
+        description="先确定测试来源与题型。"
+      >
+        {phase === 'select' && !loading ? (
+          !currentReading ? (
             <EmptyState
               icon={<ListChecks className="h-16 w-16" />}
               title="暂无阅读内容"
@@ -202,177 +206,238 @@ export function QuizPage() {
                 </p>
               )}
             </div>
-          )}
-        </>
-      )}
-
-      {loading && <LoadingSpinner text="AI 正在生成测试题..." />}
-
-      {/* Quiz phase */}
-      {phase === 'quiz' && q && (
-        <div>
-          {/* Progress */}
-          <div className="mb-5">
-            <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
-              <span>问题 {qIndex + 1} / {questions.length}</span>
-              <span className="flex items-center gap-1.5">
-                {testType === 'reading'
-                  ? <><BookOpen className="h-3.5 w-3.5" /> 阅读理解</>
-                  : <><Type className="h-3.5 w-3.5" /> 词汇测试</>
-                }
+          )
+        ) : (
+          <Card>
+            <p className="typo-body-sm text-muted-foreground">
+              当前阶段：<span className="font-semibold text-foreground">
+                {phase === 'quiz' ? '答题中' : phase === 'result' ? '查看结果' : '选择测试'}
               </span>
-            </div>
-            <div className="flashcard-progress-track">
-              <div
-                className="flashcard-progress-fill"
-                style={{ width: `${((qIndex + 1) / questions.length) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          <Card className="analysis-highlight-card pt-6 mb-4">
-            <p className="typo-h3 mb-5 break-words">{q.question}</p>
-            <div className="space-y-3">
-              {q.options.map((opt, i) => {
-                const isSelected = userAnswers[qIndex] === i;
-                const isCorrect = i === q.correctIndex;
-                const showResult = answered;
-
-                return (
-                  <div
-                    key={i}
-                    onClick={() => selectOption(i)}
-                    className={cn(
-                      'quiz-option border rounded-lg p-4 cursor-pointer flex items-center gap-3 transition-all',
-                      showResult && isCorrect && 'correct',
-                      showResult && isSelected && !isCorrect && 'incorrect',
-                      !showResult && 'border-border hover:bg-muted',
-                    )}
-                  >
-                    <span className={cn(
-                      'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border',
-                      showResult && isCorrect && 'bg-green-500 text-white border-green-500',
-                      showResult && isSelected && !isCorrect && 'bg-red-500 text-white border-red-500',
-                      !showResult && 'border-border text-muted-foreground',
-                    )}>
-                      {showResult && isCorrect ? <CheckCircle2 className="h-4 w-4" /> :
-                       showResult && isSelected && !isCorrect ? <XCircle className="h-4 w-4" /> :
-                       String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="flex-1">{opt}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {!answered && `按 ${i + 1}`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {answered && q.explanation && (
-              <div className="analysis-item mt-4 text-sm" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
-                <span className="font-semibold text-primary-700 dark:text-primary-300">解释：</span>
-                <span className="text-primary-800 dark:text-primary-200">{q.explanation}</span>
-              </div>
-            )}
-          </Card>
-
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              按 1-4 选择答案，Enter 下一题
+              {currentReading?.title ? <> · 阅读标题：<span className="font-semibold text-foreground">{currentReading.title}</span></> : null}
             </p>
-            <Button onClick={nextQuestion} disabled={!answered}>
-              {qIndex + 1 >= questions.length ? '查看结果' : '下一题'}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
+          </Card>
+        )}
+      </ModuleSection>
 
-      {/* Result phase */}
-      {phase === 'result' && (
-        <div className="animate-fade-in-up">
-          <Card className="analysis-highlight-card pt-6 text-center mb-6">
-            <p className="text-4xl mb-2">{scoreEmoji}</p>
-            <h2 className="typo-h2 mb-1">
-              {testType === 'reading' ? '阅读理解测试' : '词汇测试'} 完成
-            </h2>
-            <p className={cn('text-6xl font-bold my-6', scoreColor)}>{score}%</p>
-            <div className="flex justify-center gap-8 mb-6">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="font-medium">正确 {correctCount}</span>
+      <ModuleSection
+        type="result"
+        title="测试结果"
+        description="完成答题并查看分数与错题回顾。"
+      >
+        {loading && <LoadingSpinner text="AI 正在生成测试题..." />}
+
+        {phase === 'quiz' && q && (
+          <div>
+            <div className="mb-5">
+              <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
+                <span>问题 {qIndex + 1} / {questions.length}</span>
+                <span className="flex items-center gap-1.5">
+                  {testType === 'reading'
+                    ? <><BookOpen className="h-3.5 w-3.5" /> 阅读理解</>
+                    : <><Type className="h-3.5 w-3.5" /> 词汇测试</>
+                  }
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <XCircle className="h-5 w-5" />
-                <span className="font-medium">错误 {wrongCount}</span>
+              <div className="flashcard-progress-track">
+                <div
+                  className="flashcard-progress-fill"
+                  style={{ width: `${((qIndex + 1) / questions.length) * 100}%` }}
+                />
               </div>
             </div>
 
-            {score < 80 && (
-              <div className="mb-6 text-left text-sm">
-                <p className="analysis-card-header !mb-3 justify-center">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" /> <span className="font-semibold">改进建议</span>
-                </p>
-                <ul className="space-y-2">
-                  <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>加强阅读理解能力，注重把握文章主旨</li>
-                  <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>扩大词汇量，特别是关键学术词汇</li>
-                  <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>练习识别文章的逻辑结构和论证方式</li>
-                </ul>
+            <Card className="analysis-highlight-card pt-6 mb-4">
+              <p className="typo-h3 mb-5 break-words">{q.question}</p>
+              <div className="space-y-3">
+                {q.options.map((opt, i) => {
+                  const isSelected = userAnswers[qIndex] === i;
+                  const isCorrect = i === q.correctIndex;
+                  const showResult = answered;
+
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => selectOption(i)}
+                      className={cn(
+                        'quiz-option border rounded-lg p-4 cursor-pointer flex items-center gap-3 transition-all',
+                        showResult && isCorrect && 'correct',
+                        showResult && isSelected && !isCorrect && 'incorrect',
+                        !showResult && 'border-border hover:bg-muted',
+                      )}
+                    >
+                      <span className={cn(
+                        'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border',
+                        showResult && isCorrect && 'bg-green-500 text-white border-green-500',
+                        showResult && isSelected && !isCorrect && 'bg-red-500 text-white border-red-500',
+                        !showResult && 'border-border text-muted-foreground',
+                      )}>
+                        {showResult && isCorrect ? <CheckCircle2 className="h-4 w-4" /> :
+                         showResult && isSelected && !isCorrect ? <XCircle className="h-4 w-4" /> :
+                         String.fromCharCode(65 + i)}
+                      </span>
+                      <span className="flex-1">{opt}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {!answered && `按 ${i + 1}`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {answered && q.explanation && (
+                <div className="analysis-item mt-4 text-sm" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
+                  <span className="font-semibold text-primary-700 dark:text-primary-300">解释：</span>
+                  <span className="text-primary-800 dark:text-primary-200">{q.explanation}</span>
+                </div>
+              )}
+            </Card>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                按 1-4 选择答案，Enter 下一题
+              </p>
+              <Button onClick={nextQuestion} disabled={!answered}>
+                {qIndex + 1 >= questions.length ? '查看结果' : '下一题'}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'result' && (
+          <div className="animate-fade-in-up">
+            <Card className="analysis-highlight-card pt-6 text-center mb-6">
+              <p className="text-4xl mb-2">{scoreEmoji}</p>
+              <h2 className="typo-h2 mb-1">
+                {testType === 'reading' ? '阅读理解测试' : '词汇测试'} 完成
+              </h2>
+              <p className={cn('text-6xl font-bold my-6', scoreColor)}>{score}%</p>
+              <div className="flex justify-center gap-8 mb-6">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-medium">正确 {correctCount}</span>
+                </div>
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <XCircle className="h-5 w-5" />
+                  <span className="font-medium">错误 {wrongCount}</span>
+                </div>
+              </div>
+
+              {score < 80 && (
+                <div className="mb-6 text-left text-sm">
+                  <p className="analysis-card-header !mb-3 justify-center">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" /> <span className="font-semibold">改进建议</span>
+                  </p>
+                  <ul className="space-y-2">
+                    <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>加强阅读理解能力，注重把握文章主旨</li>
+                    <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>扩大词汇量，特别是关键学术词汇</li>
+                    <li className="analysis-item" style={{ '--item-color': '#f59e0b' } as React.CSSProperties}>练习识别文章的逻辑结构和论证方式</li>
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex flex-wrap justify-center gap-3">
+                {wrongCount > 0 && (
+                  <Button variant="secondary" onClick={() => setShowReview(!showReview)}>
+                    <AlertTriangle className="h-4 w-4 mr-1.5" />
+                    {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); }}>
+                  <RotateCcw className="h-4 w-4 mr-1.5" /> 重新选择
+                </Button>
+                <Button onClick={() => navigate('/achievements')}>
+                  <Trophy className="h-4 w-4 mr-1.5" /> 查看成就
+                </Button>
+              </div>
+            </Card>
+
+            {showReview && wrongQuestions.length > 0 && (
+              <div className="space-y-4">
+                <div className="analysis-card-header">
+                  <XCircle className="h-5 w-5 text-red-500" />
+                  <h3 className="typo-h3">错题回顾</h3>
+                </div>
+                {wrongQuestions.map((wq, i) => (
+                  <Card key={i} className="border-red-200 dark:border-red-900/50">
+                    <p className="font-semibold mb-3">
+                      <span className="text-red-500 mr-2">#{wq.index + 1}</span>
+                      {wq.question}
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      {wq.options.map((opt, oi) => (
+                        <div key={oi} className={cn(
+                          'px-3 py-2 rounded-md flex items-center gap-2',
+                          oi === wq.correctIndex && 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
+                          oi === wq.userAnswer && oi !== wq.correctIndex && 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through',
+                        )}>
+                          {oi === wq.correctIndex && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+                          {oi === wq.userAnswer && oi !== wq.correctIndex && <XCircle className="h-4 w-4 shrink-0" />}
+                          <span>{opt}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {wq.explanation && (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        <span className="font-medium">解释：</span>{wq.explanation}
+                      </p>
+                    )}
+                  </Card>
+                ))}
               </div>
             )}
+          </div>
+        )}
+      </ModuleSection>
 
-            <div className="flex flex-wrap justify-center gap-3">
-              {wrongCount > 0 && (
-                <Button variant="secondary" onClick={() => setShowReview(!showReview)}>
-                  <AlertTriangle className="h-4 w-4 mr-1.5" />
-                  {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
-                </Button>
-              )}
-              <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); }}>
-                <RotateCcw className="h-4 w-4 mr-1.5" /> 重新选择
-              </Button>
-              <Button onClick={() => navigate('/achievements')}>
-                <Trophy className="h-4 w-4 mr-1.5" /> 查看成就
-              </Button>
-            </div>
-          </Card>
-
-          {/* Error review */}
-          {showReview && wrongQuestions.length > 0 && (
-            <div className="space-y-4">
-              <div className="analysis-card-header">
-                <XCircle className="h-5 w-5 text-red-500" />
-                <h3 className="typo-h3">错题回顾</h3>
-              </div>
-              {wrongQuestions.map((wq, i) => (
-                <Card key={i} className="border-red-200 dark:border-red-900/50">
-                  <p className="font-semibold mb-3">
-                    <span className="text-red-500 mr-2">#{wq.index + 1}</span>
-                    {wq.question}
-                  </p>
-                  <div className="space-y-2 text-sm">
-                    {wq.options.map((opt, oi) => (
-                      <div key={oi} className={cn(
-                        'px-3 py-2 rounded-md flex items-center gap-2',
-                        oi === wq.correctIndex && 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300',
-                        oi === wq.userAnswer && oi !== wq.correctIndex && 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 line-through',
-                      )}>
-                        {oi === wq.correctIndex && <CheckCircle2 className="h-4 w-4 shrink-0" />}
-                        {oi === wq.userAnswer && oi !== wq.correctIndex && <XCircle className="h-4 w-4 shrink-0" />}
-                        <span>{opt}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {wq.explanation && (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      <span className="font-medium">解释：</span>{wq.explanation}
-                    </p>
-                  )}
-                </Card>
+      <ModuleSection
+        type="history"
+        title="测试历史"
+        description="最近测验会保存在本地，便于持续追踪。"
+      >
+        <Card>
+          {testHistory.length > 0 ? (
+            <div className="space-y-2">
+              {testHistory.slice(-6).reverse().map((item, idx) => (
+                <div key={`${item.date}-${idx}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                  <span className="font-medium">{item.type === 'reading' ? '阅读理解' : '词汇测试'}</span>
+                  <span className="text-muted-foreground">{item.readingTitle}</span>
+                  <span className="font-semibold text-primary-600 dark:text-primary-400">{item.score} 分</span>
+                </div>
               ))}
             </div>
+          ) : (
+            <p className="typo-body-sm text-muted-foreground">暂无测试历史，先完成一次测验。</p>
           )}
-        </div>
-      )}
+        </Card>
+      </ModuleSection>
+
+      <ModuleSection
+        type="action"
+        title="测试操作"
+        description="在不同阶段快速切换下一步动作。"
+      >
+        <Card>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => navigate('/reading')}>
+              前往双语阅读
+            </Button>
+            {phase !== 'select' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); setAnswered(false); }}
+              >
+                返回选题
+              </Button>
+            )}
+            {phase === 'result' && (
+              <Button size="sm" onClick={() => navigate('/achievements')}>
+                查看学习成就
+              </Button>
+            )}
+          </div>
+        </Card>
+      </ModuleSection>
     </div>
   );
 }

@@ -1,5 +1,34 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-09-module-framework-unification)
+
+### Completed
+- Completed `P1-09` (unify five module page framework).
+- Added shared section scaffold: `client/src/components/layout/ModuleSection.tsx`.
+  - standardized zone semantics and ordering:
+    - 输入区
+    - 结果区
+    - 历史区
+    - 操作区
+- Applied unified framework to all five modules:
+  - `FlashcardsPage`
+  - `SentenceAnalysisPage`
+  - `ReadingPage`
+  - `QuizPage`
+  - `AchievementsPage`
+- Added supporting behavior to align with new framework:
+  - quiz page now reads and displays local test history
+  - achievements page now reads and loads report history (not only writes)
+  - shared section label styling added in global CSS
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-09` is complete; five core pages now follow one consistent information partition and action sequence.
+- Next step is `P1-10` (key motion and responsive detail polishing).
+
 ## 2026-02-25 (complete/p1-08-homepage-ia-refresh)
 
 ### Completed

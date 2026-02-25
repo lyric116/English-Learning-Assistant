@@ -1,5 +1,54 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Five-Module Framework Unification (`P1-09`)
+
+### `client/src/components/layout/ModuleSection.tsx`
+- Role: shared module-page zone scaffold.
+- Changes:
+  - introduces explicit zone semantics (`input/result/history/action`)
+  - standardizes zone label, title, and description structure
+  - provides one reusable scaffold for cross-module consistency
+
+### `client/src/index.css`
+- Role: global style registry for layout primitives.
+- Changes:
+  - added `module-section-shell` and `module-section-label` styles
+  - keeps section spacing and visual identity consistent across all modules
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Role: vocabulary flashcard learning workflow.
+- Changes:
+  - reorganized into four zones with stable order
+  - added explicit history summary and session action controls
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: sentence parsing and grammar explanation workflow.
+- Changes:
+  - reorganized into four zones with stable order
+  - moved recent analyses into dedicated history zone
+  - added explicit action zone (rerun/copy/reset/clear history)
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: bilingual reading generation workflow.
+- Changes:
+  - reorganized into four zones with stable order
+  - reading favorites grouped into dedicated history zone
+  - operation toolbar moved into dedicated action zone
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz generation/answer/result workflow.
+- Changes:
+  - reorganized into four zones with stable order
+  - added persistent local test-history rendering in history zone
+  - added dedicated action zone for stage transitions/navigation
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: report generation and review workflow.
+- Changes:
+  - reorganized into four zones with stable order
+  - local report history now read + reloadable (previously write-only)
+  - report actions centralized in dedicated action zone
+
 ## Update 2026-02-25: Homepage IA Refresh (`P1-08`)
 
 ### `client/src/pages/HomePage.tsx`

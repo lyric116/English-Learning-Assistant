@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ModuleSection } from '@/components/layout/ModuleSection';
 import { AlignLeft, Copy, Check, X, GitMerge, Clock, Quote, Sparkles, Type, Braces, History } from 'lucide-react';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 import type { SentenceAnalysis } from '@/types';
@@ -96,6 +97,13 @@ export function SentenceAnalysisPage() {
     setActiveTooltip(null);
   };
 
+  const clearCurrent = () => {
+    setInput('');
+    setResult(null);
+    setActiveTooltip(null);
+    setErrorMessage('');
+  };
+
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up">
       <AIConfigBanner />
@@ -108,170 +116,157 @@ export function SentenceAnalysisPage() {
         />
       )}
 
-      <Card className="mb-10">
-        <div className="relative">
-          <Textarea
-            rows={5}
-            placeholder="输入英语句子进行语法分析..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && analyze()}
-          />
-          {input && (
-            <button
-              onClick={() => setInput('')}
-              className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-4 flex-wrap">
-          <Button onClick={analyze} loading={loading} disabled={!input.trim()}>
-            分析句子
-          </Button>
-          <div className="h-4 w-px bg-border mx-1" />
-          {examples.map((ex, i) => (
-            <button
-              key={i}
-              onClick={() => setInput(ex.text)}
-              className="px-3 py-1 text-xs font-medium rounded-full border border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-            >
-              {ex.label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* Recent analyses */}
-      {history.length > 0 && !loading && (
-        <div className="flex flex-wrap gap-2 mb-8">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
-            <History className="h-3.5 w-3.5" /> 最近分析
-          </span>
-          {history.map((h, i) => (
-            <button
-              key={i}
-              onClick={() => loadRecord(h)}
-              className={cn(
-                'px-3 py-1.5 text-xs rounded-full border transition-all max-w-[260px] truncate',
-                h.sentence === input
-                  ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400',
-              )}
-              title={h.sentence}
-            >
-              {h.sentence}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading && <LoadingSpinner text="AI 正在分析句子结构..." />}
-
-      {!result && !loading && (
-        <EmptyState
-          icon={<AlignLeft className="h-16 w-16" />}
-          title="输入句子开始分析"
-          description="支持简单句、复合句、复杂句等各种句型，AI 会标注句子成分并解析语法要点。"
-        />
-      )}
-
-      {result && (
-        <div className="space-y-6">
-          {/* Structure */}
-          <Card className="analysis-highlight-card pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="analysis-card-header !mb-0">
-                <Braces className="h-5 w-5 text-primary-500" />
-                <h2 className="text-lg font-bold">句子结构</h2>
-              </div>
-              <Button variant="ghost" size="sm" onClick={copyResult}>
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? '已复制' : '复制'}
-              </Button>
-            </div>
-            <div className="relative bg-muted/50 rounded-lg p-5 border border-border/30">
-              <span className="absolute top-2 left-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
-              <p className="text-xl leading-relaxed font-serif pl-5 pr-5">{input}</p>
-              <span className="absolute bottom-1 right-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
-            </div>
-            {result.structure && (
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="analysis-item" style={{ '--item-color': '#3b82f6' } as React.CSSProperties}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Type className="h-3.5 w-3.5 text-blue-500" />
-                    <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">句子类型</p>
-                  </div>
-                  <p className="font-medium">{result.structure.type}</p>
-                </div>
-                <div className="analysis-item" style={{ '--item-color': '#8b5cf6' } as React.CSSProperties}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <AlignLeft className="h-3.5 w-3.5 text-purple-500" />
-                    <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">结构解释</p>
-                  </div>
-                  <p>{result.structure.explanation}</p>
-                </div>
-              </div>
+      <ModuleSection
+        type="input"
+        title="输入待分析句子"
+        description="支持手动输入或使用示例句，按回车即可触发分析。"
+      >
+        <Card>
+          <div className="relative">
+            <Textarea
+              rows={5}
+              placeholder="输入英语句子进行语法分析..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && analyze()}
+            />
+            {input && (
+              <button
+                onClick={() => setInput('')}
+                className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
-          </Card>
+          </div>
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            <Button onClick={analyze} loading={loading} disabled={!input.trim()}>
+              分析句子
+            </Button>
+            <div className="h-4 w-px bg-border mx-1" />
+            {examples.map((ex, i) => (
+              <button
+                key={i}
+                onClick={() => setInput(ex.text)}
+                className="px-3 py-1 text-xs font-medium rounded-full border border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+      </ModuleSection>
 
-          {/* Components with legend */}
-          {result.components && result.components.length > 0 && (
-            <Card className="overflow-hidden">
+      <ModuleSection
+        type="result"
+        title="句子分析结果"
+        description="查看结构拆解、从句时态、短语和语法要点。"
+      >
+        {loading && <LoadingSpinner text="AI 正在分析句子结构..." />}
+
+        {!result && !loading && (
+          <EmptyState
+            icon={<AlignLeft className="h-16 w-16" />}
+            title="输入句子开始分析"
+            description="支持简单句、复合句、复杂句等各种句型，AI 会标注句子成分并解析语法要点。"
+          />
+        )}
+
+        {result && (
+          <div className="space-y-6">
+          {/* Structure */}
+            <Card className="analysis-highlight-card pt-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">句子成分</h2>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {legend.map(l => (
-                    <span key={l.label} className="flex items-center gap-1.5">
-                      <span className="legend-dot" style={{ backgroundColor: l.color }} />
-                      {l.label}
-                    </span>
+                <div className="analysis-card-header !mb-0">
+                  <Braces className="h-5 w-5 text-primary-500" />
+                  <h2 className="text-lg font-bold">句子结构</h2>
+                </div>
+                <Button variant="ghost" size="sm" onClick={copyResult}>
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? '已复制' : '复制'}
+                </Button>
+              </div>
+              <div className="relative bg-muted/50 rounded-lg p-5 border border-border/30">
+                <span className="absolute top-2 left-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
+                <p className="text-xl leading-relaxed font-serif pl-5 pr-5">{input}</p>
+                <span className="absolute bottom-1 right-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
+              </div>
+              {result.structure && (
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div className="analysis-item" style={{ '--item-color': '#3b82f6' } as React.CSSProperties}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Type className="h-3.5 w-3.5 text-blue-500" />
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">句子类型</p>
+                    </div>
+                    <p className="font-medium">{result.structure.type}</p>
+                  </div>
+                  <div className="analysis-item" style={{ '--item-color': '#8b5cf6' } as React.CSSProperties}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AlignLeft className="h-3.5 w-3.5 text-purple-500" />
+                      <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">结构解释</p>
+                    </div>
+                    <p>{result.structure.explanation}</p>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Components with legend */}
+            {result.components && result.components.length > 0 && (
+              <Card className="overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold">句子成分</h2>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {legend.map(l => (
+                      <span key={l.label} className="flex items-center gap-1.5">
+                        <span className="legend-dot" style={{ backgroundColor: l.color }} />
+                        {l.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  {result.components.map((comp, i) => (
+                    <button
+                      key={i}
+                      className={cn(
+                        'component-chip',
+                        getComponentClass(comp.type),
+                        activeTooltip === i && 'component-chip-active',
+                      )}
+                      onClick={() => setActiveTooltip(activeTooltip === i ? null : i)}
+                    >
+                      <span className="component-chip-type">{comp.type}</span>
+                      <span className="component-chip-text">{comp.text}</span>
+                    </button>
                   ))}
                 </div>
-              </div>
 
-              <div className="flex flex-wrap gap-2.5">
-                {result.components.map((comp, i) => (
-                  <button
-                    key={i}
-                    className={cn(
-                      'component-chip',
-                      getComponentClass(comp.type),
-                      activeTooltip === i && 'component-chip-active',
-                    )}
-                    onClick={() => setActiveTooltip(activeTooltip === i ? null : i)}
-                  >
-                    <span className="component-chip-type">{comp.type}</span>
-                    <span className="component-chip-text">{comp.text}</span>
-                  </button>
-                ))}
-              </div>
-
-              {activeTooltip !== null && result.components[activeTooltip] && (() => {
-                const comp = result.components[activeTooltip];
-                return (
-                  <div
-                    className={cn('component-detail-panel mt-5 bg-muted/60 p-4', getComponentClass(comp.type))}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold tracking-wide text-muted-foreground mb-1">{comp.type}</p>
-                        <p className="font-serif text-base italic text-foreground/90 mb-2">"{comp.text}"</p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{comp.explanation}</p>
+                {activeTooltip !== null && result.components[activeTooltip] && (() => {
+                  const comp = result.components[activeTooltip];
+                  return (
+                    <div
+                      className={cn('component-detail-panel mt-5 bg-muted/60 p-4', getComponentClass(comp.type))}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold tracking-wide text-muted-foreground mb-1">{comp.type}</p>
+                          <p className="font-serif text-base italic text-foreground/90 mb-2">"{comp.text}"</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{comp.explanation}</p>
+                        </div>
+                        <button
+                          onClick={() => setActiveTooltip(null)}
+                          className="p-1.5 rounded-full hover:bg-background/80 transition-colors text-muted-foreground shrink-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setActiveTooltip(null)}
-                        className="p-1.5 rounded-full hover:bg-background/80 transition-colors text-muted-foreground shrink-0"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
                     </div>
-                  </div>
-                );
-              })()}
-            </Card>
-          )}
+                  );
+                })()}
+              </Card>
+            )}
 
           {/* Clauses & Tense */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -358,8 +353,65 @@ export function SentenceAnalysisPage() {
               )}
             </Card>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </ModuleSection>
+
+      <ModuleSection
+        type="history"
+        title="最近分析历史"
+        description="保留最近 3 条分析记录，可一键重新加载。"
+      >
+        <Card>
+          {history.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+                <History className="h-3.5 w-3.5" /> 最近分析
+              </span>
+              {history.map((h, i) => (
+                <button
+                  key={i}
+                  onClick={() => loadRecord(h)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs rounded-full border transition-all max-w-[260px] truncate',
+                    h.sentence === input
+                      ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                      : 'border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400',
+                  )}
+                  title={h.sentence}
+                >
+                  {h.sentence}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="typo-body-sm text-muted-foreground">暂无历史记录，先完成一次句子分析。</p>
+          )}
+        </Card>
+      </ModuleSection>
+
+      <ModuleSection
+        type="action"
+        title="分析操作"
+        description="快速重跑分析、复制结果或重置历史。"
+      >
+        <Card>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={analyze} loading={loading} disabled={!input.trim()}>
+              重新分析
+            </Button>
+            <Button variant="secondary" size="sm" onClick={copyResult} disabled={!result}>
+              复制结果
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearCurrent}>
+              清空当前
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setHistory([])} disabled={history.length === 0}>
+              清空历史
+            </Button>
+          </div>
+        </Card>
+      </ModuleSection>
     </div>
   );
 }

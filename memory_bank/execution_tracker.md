@@ -20,7 +20,7 @@
 | 14 | P1-06 | completed | Feedback system unified: Loading/Empty/Toast/Skeleton refreshed and shared inline error alert applied to all five modules. |
 | 15 | P1-07 | completed | Navigation and page shell refactored: Navbar/Footer/Layout spacing and layering unified, mobile menu overlay/collapse improved, settings entry stable on both desktop and mobile. |
 | 16 | P1-08 | completed | Homepage information architecture upgraded: stronger product positioning, dual CTA hierarchy, explicit five-module entry map, and guided learning path blocks. |
-| 17 | P1-09 | pending | Not started. |
+| 17 | P1-09 | completed | Five-module framework unified with shared section scaffold (`输入区/结果区/历史区/操作区`) and consistent ordering across Flashcards/Sentence/Reading/Quiz/Achievements. |
 | 18 | P1-10 | pending | Not started. |
 | 19 | P2-F-01 | pending | Not started. |
 | 20 | P2-F-02 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P1-09`.
+- First not-yet-completed step: `P1-10`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

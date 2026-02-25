@@ -6,8 +6,19 @@ export const readingRouter = Router();
 
 readingRouter.post('/generate', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { text, language, aiConfig } = validateReadingGeneratePayload(req.body);
-    const result = await generateReadingContent(text, language, aiConfig);
+    const {
+      text,
+      language,
+      topic,
+      difficulty,
+      length,
+      aiConfig,
+    } = validateReadingGeneratePayload(req.body);
+    const result = await generateReadingContent(
+      text,
+      { language, topic, difficulty, length },
+      aiConfig,
+    );
     res.json(result);
   } catch (err) {
     next(err);

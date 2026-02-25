@@ -104,11 +104,46 @@ export function buildAnalyzeSentencePrompt(sentence: string): string {
 句子：${sentence}`;
 }
 
-export function buildReadingContentPrompt(text: string, language: string): string {
-  if (language === 'en') {
+interface ReadingPromptOptions {
+  language: 'en' | 'zh';
+  topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
+  difficulty: 'easy' | 'medium' | 'hard';
+  length: 'short' | 'medium' | 'long';
+}
+
+export function buildReadingContentPrompt(text: string, options: ReadingPromptOptions): string {
+  const topicPromptMap: Record<ReadingPromptOptions['topic'], string> = {
+    general: '综合日常学习',
+    work: '职场沟通与商务场景',
+    travel: '旅行出行与跨文化交流',
+    technology: '科技与互联网',
+    culture: '文化艺术与社会话题',
+    education: '学习方法与教育主题',
+  };
+  const difficultyPromptMap: Record<ReadingPromptOptions['difficulty'], string> = {
+    easy: '基础难度（优先高频词、短句、清晰表达）',
+    medium: '中等难度（兼顾表达丰富度与可读性）',
+    hard: '较高难度（可包含复合句与进阶词汇）',
+  };
+  const lengthPromptMap: Record<ReadingPromptOptions['length'], string> = {
+    short: '短篇（约 120-180 词）',
+    medium: '中篇（约 220-320 词）',
+    long: '长篇（约 380-520 词）',
+  };
+
+  const topicPrompt = topicPromptMap[options.topic];
+  const difficultyPrompt = difficultyPromptMap[options.difficulty];
+  const lengthPrompt = lengthPromptMap[options.length];
+
+  if (options.language === 'en') {
     return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，将以下英文文本翻译成中文，并提取重要词汇：
 
 英文原文：${text}
+
+生成要求：
+- 主题导向：${topicPrompt}
+- 难度要求：${difficultyPrompt}
+- 篇幅控制：${lengthPrompt}
 
 请提供以下内容：
 1. 保持原始英文文本不变
@@ -135,6 +170,11 @@ export function buildReadingContentPrompt(text: string, language: string): strin
   return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，请将以下中文文本翻译成英文，并提取重要词汇：
 
 中文原文：${text}
+
+生成要求：
+- 主题导向：${topicPrompt}
+- 难度要求：${difficultyPrompt}
+- 篇幅控制：${lengthPrompt}
 
 请提供以下内容：
 1. 保持原始中文文本不变

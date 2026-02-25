@@ -19,6 +19,13 @@ interface AIConfig {
   model: string;
 }
 
+interface ReadingGenerateOptions {
+  language: 'en' | 'zh';
+  topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
+  difficulty: 'easy' | 'medium' | 'hard';
+  length: 'short' | 'medium' | 'long';
+}
+
 interface ErrorBody {
   error?: { message?: string };
 }
@@ -141,6 +148,47 @@ function validateAIConfig(aiConfig?: AIConfig): asserts aiConfig is AIConfig {
   aiConfig.baseUrl = validateBaseUrl(baseUrl);
 }
 
+function normalizeReadingOptions(options?: Partial<ReadingGenerateOptions>): ReadingGenerateOptions {
+  return {
+    language: options?.language ?? 'en',
+    topic: options?.topic ?? 'general',
+    difficulty: options?.difficulty ?? 'medium',
+    length: options?.length ?? 'medium',
+  };
+}
+
+function normalizeReadingResponse(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('阅读生成失败：AI 返回格式无效');
+  }
+
+  const raw = payload as Record<string, unknown>;
+  const english = typeof raw.english === 'string' ? raw.english.trim() : '';
+  const chinese = typeof raw.chinese === 'string' ? raw.chinese.trim() : '';
+
+  if (!english || !chinese) {
+    throw new Error('阅读生成失败：缺少双语正文字段（english/chinese）');
+  }
+
+  const vocabulary = Array.isArray(raw.vocabulary) ? raw.vocabulary : [];
+  const normalizedVocabulary = vocabulary
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map(item => ({
+      word: typeof item.word === 'string' ? item.word.trim() : '',
+      phonetic: typeof item.phonetic === 'string' ? item.phonetic.trim() : undefined,
+      meaning: typeof item.meaning === 'string' ? item.meaning.trim() : '',
+      example: typeof item.example === 'string' ? item.example.trim() : undefined,
+    }))
+    .filter(item => item.word && item.meaning);
+
+  return {
+    english,
+    chinese,
+    vocabulary: normalizedVocabulary,
+    title: typeof raw.title === 'string' ? raw.title.trim() : undefined,
+  };
+}
+
 async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unknown>): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config.ai.requestTimeoutMs);
@@ -208,14 +256,12 @@ export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
   return parseJsonResponse(content);
 }
 
-export async function generateReadingContent(text: string, language = 'en', aiConfig?: AIConfig) {
-  const prompt = buildReadingContentPrompt(text, language);
+export async function generateReadingContent(text: string, options?: Partial<ReadingGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeReadingOptions(options);
+  const prompt = buildReadingContentPrompt(text, normalizedOptions);
   const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 2000 }, aiConfig);
-  const result = parseJsonResponse<{ english: string; chinese: string; vocabulary: unknown[] }>(content);
-  if (!result.english || !result.chinese || !Array.isArray(result.vocabulary)) {
-    throw new Error('AI返回的数据格式不正确');
-  }
-  return result;
+  const result = parseJsonResponse(content);
+  return normalizeReadingResponse(result);
 }
 
 export async function generateReadingQuestions(reading: string, questionCount = 5, aiConfig?: AIConfig) {

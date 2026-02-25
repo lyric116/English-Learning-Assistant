@@ -1,5 +1,42 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Reading Backend Contract Sync (`P2-R-02`)
+
+### `server/src/utils/request-validator.ts`
+- Role: backend request contract gate for reading generation.
+- Changes:
+  - reading payload now validates:
+    - `language`
+    - `topic`
+    - `difficulty`
+    - `length`
+  - unsupported enum values are rejected before reaching AI service.
+
+### `server/src/routes/reading.ts`
+- Role: reading generation route boundary.
+- Changes:
+  - now forwards the full validated reading options object to service layer
+  - keeps route payload-to-service mapping explicit and typed.
+
+### `server/src/services/ai-service.ts`
+- Role: reading generation orchestration + AI output normalization.
+- Changes:
+  - added option normalizer for reading generation defaults
+  - upgraded `generateReadingContent` to structured options signature
+  - added reading response normalizer:
+    - enforces required `english/chinese`
+    - normalizes `vocabulary` item shape
+    - emits clear domain errors on invalid payload
+
+### `server/src/utils/prompt-builder.ts`
+- Role: reading prompt policy source.
+- Changes:
+  - `buildReadingContentPrompt` now accepts reading options object
+  - prompt now includes topic/difficulty/length constraints for controllable output behavior
+
+### Reliability Impact
+- Reading backend now has a complete option-aware contract from request validation through prompt generation to response normalization.
+
 ## Update 2026-02-25: Reading Parameter Extension (`P2-R-01`)
 
 ### `client/src/pages/ReadingPage.tsx`

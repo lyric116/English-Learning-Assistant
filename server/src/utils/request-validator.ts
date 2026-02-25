@@ -26,6 +26,9 @@ interface SentenceAnalyzePayload {
 interface ReadingGeneratePayload {
   text: string;
   language: 'en' | 'zh';
+  topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
+  difficulty: 'easy' | 'medium' | 'hard';
+  length: 'short' | 'medium' | 'long';
   aiConfig?: ValidatedAIConfig;
 }
 
@@ -209,9 +212,30 @@ export function validateReadingGeneratePayload(body: unknown): ReadingGeneratePa
 
   const text = readRequiredString(obj, 'text', '文本内容', MAX_READING_LENGTH);
   const language = readOptionalEnum(obj, 'language', 'en', '语言方向', ['en', 'zh'] as const);
+  const topic = readOptionalEnum(
+    obj,
+    'topic',
+    'general',
+    '阅读主题',
+    ['general', 'work', 'travel', 'technology', 'culture', 'education'] as const,
+  );
+  const difficulty = readOptionalEnum(
+    obj,
+    'difficulty',
+    'medium',
+    '阅读难度',
+    ['easy', 'medium', 'hard'] as const,
+  );
+  const length = readOptionalEnum(
+    obj,
+    'length',
+    'medium',
+    '阅读篇幅',
+    ['short', 'medium', 'long'] as const,
+  );
   const aiConfig = readOptionalAiConfig(obj);
 
-  return { text, language, aiConfig };
+  return { text, language, topic, difficulty, length, aiConfig };
 }
 
 export function validateReadingQuestionsPayload(body: unknown): ReadingQuestionsPayload {

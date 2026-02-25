@@ -1,5 +1,29 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-r-02-reading-backend-sync)
+
+### Completed
+- Completed `P2-R-02` (阅读后端参数校验与生成规则同步).
+- Backend validator upgrade (`request-validator`):
+  - reading payload now validates `topic/difficulty/length/language`
+  - invalid enum values are explicitly rejected with readable errors
+- Backend generation sync:
+  - `generateReadingContent` now accepts structured reading options
+  - `buildReadingContentPrompt` now uses topic/difficulty/length to constrain output style and length
+  - route forwards validated options into generation service
+- Response contract hardening:
+  - reading service now normalizes AI response and enforces required bilingual正文字段
+  - invalid shape/missing fields now return clear domain errors instead of ambiguous runtime failures
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-R-02` is complete; reading module backend now aligns with expanded parameter contract.
+- Next step is `P2-R-03` (阅读控制面板升级 + 配置摘要展示).
+
 ## 2026-02-25 (complete/p2-r-01-reading-parameter-extension)
 
 ### Completed

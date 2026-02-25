@@ -1,5 +1,33 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-05-repository-layer)
+
+### Completed
+- Completed `P3-05` (后端仓储层抽象).
+- Added repository infrastructure:
+  - `server/src/repositories/sqlite-client.ts`
+  - `server/src/repositories/learning-data-repository.ts`
+  - `server/src/utils/logger.ts`（结构化日志输出）
+- Route integration (one persistence write path per module):
+  - Flashcards: `/flashcards/extract` -> `persistFlashcards`
+  - Sentence: `/sentence/analyze` -> `persistSentenceAnalysis`
+  - Reading: `/reading/generate` -> `persistReadingContent`
+  - Quiz: `/quiz/*-questions` -> `persistQuizGeneration`
+  - Report: `/report/generate` -> `persistLearningReport`
+- Persistence behavior:
+  - DB 写入失败不阻塞 AI 主流程
+  - 每次写入有 `repository.write.ok / repository.write.failed` 可追踪日志
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd server && SQLITE_DB_PATH=/tmp/english-learning-p305-test.db npm run db:migrate` ✅
+- 直接调用五个 `persist*` 方法后查询计数：`flashcards/sentence_analyses/reading_contents/quiz_attempts/learning_reports = 1|1|1|1|1` ✅
+- 运行日志包含模块级写入记录（`repository.write.ok`）✅
+
+### Notes For Next Developer
+- `P3-05` is complete; backend now has a unified repository write layer across all five modules.
+- Next step is `P3-06` (第一批持久化迁移：闪卡与句子历史从本地迁移至后端读取链路).
+
 ## 2026-02-25 (complete/p3-04-migration-mechanism)
 
 ### Completed

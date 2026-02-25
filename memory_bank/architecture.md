@@ -1,5 +1,42 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Repository Layer Abstraction (`P3-05`)
+
+### `server/src/repositories/sqlite-client.ts`
+- Role: low-level SQLite execution adapter.
+- Capabilities:
+  - resolves DB path and sqlite binary
+  - executes SQL scripts with foreign-key pragma
+  - provides shared SQL literal escaping helper
+
+### `server/src/repositories/learning-data-repository.ts`
+- Role: module-oriented data access layer.
+- Exposes write methods:
+  - `persistFlashcards`
+  - `persistSentenceAnalysis`
+  - `persistReadingContent`
+  - `persistQuizGeneration`
+  - `persistLearningReport`
+- Behavior:
+  - normalizes owner context (`x-anonymous-session-id`)
+  - swallows persistence failures to avoid blocking AI main flow
+  - emits structured success/failure logs for traceability
+
+### `server/src/utils/logger.ts`
+- Role: structured log emitter for repository operations.
+- Provides `info/warn/error` JSON log wrappers with timestamp and payload context.
+
+### Route Wiring
+- `server/src/routes/flashcards.ts`
+- `server/src/routes/sentence.ts`
+- `server/src/routes/reading.ts`
+- `server/src/routes/quiz.ts`
+- `server/src/routes/report.ts`
+- Each route now calls one repository write operation after successful AI output normalization.
+
+### Architectural Impact
+- Route layer now has explicit separation from persistence details, and all five modules share one traceable data-access boundary for incremental migration.
+
 ## Update 2026-02-25: Migration Mechanism (`P3-04`)
 
 ### `server/scripts/migrate.js`

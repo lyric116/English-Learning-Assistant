@@ -31,6 +31,10 @@ logs
 # 临时文件
 tmp/
 temp/
+*.db
+*.sqlite
+*.sqlite3
+server/data/
 
 # Vercel
 .vercel

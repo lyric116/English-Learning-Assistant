@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { analyzeSentence } from '../services/ai-service';
 import { validateSentenceAnalyzePayload } from '../utils/request-validator';
+import { learningDataRepository } from '../repositories/learning-data-repository';
 
 export const sentenceRouter = Router();
 
@@ -158,6 +159,11 @@ sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFu
     const { sentence, aiConfig } = validateSentenceAnalyzePayload(req.body);
     const result = await analyzeSentence(sentence, aiConfig);
     const normalizedResult = normalizeSentenceAnalysis(result);
+    learningDataRepository.persistSentenceAnalysis(
+      req.header('x-anonymous-session-id') || undefined,
+      sentence,
+      normalizedResult,
+    );
     res.json(normalizedResult);
   } catch (err) {
     next(err);

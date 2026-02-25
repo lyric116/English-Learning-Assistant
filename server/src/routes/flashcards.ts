@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { extractWords } from '../services/ai-service';
 import { validateFlashcardsExtractPayload } from '../utils/request-validator';
+import { learningDataRepository } from '../repositories/learning-data-repository';
 
 export const flashcardsRouter = Router();
 
@@ -42,6 +43,7 @@ flashcardsRouter.post('/extract', async (req: Request, res: Response, next: Next
     const { text, maxWords, level, aiConfig } = validateFlashcardsExtractPayload(req.body);
     const result = await extractWords(text, maxWords, level, aiConfig);
     const normalizedResult = normalizeExtractedWords(result, maxWords);
+    learningDataRepository.persistFlashcards(req.header('x-anonymous-session-id') || undefined, normalizedResult);
     res.json(normalizedResult);
   } catch (err) {
     next(err);

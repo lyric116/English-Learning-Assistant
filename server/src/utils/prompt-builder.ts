@@ -40,25 +40,28 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
 }
 
 export function buildAnalyzeSentencePrompt(sentence: string): string {
-  return `请你作为一位专业的英语语法分析专家，对下面这个英文句子进行全面细致的语法分析。请按照以下六个部分逐一分析，并用中文准确无误的输出结果：
+  return `请你作为一位专业的英语语法分析专家，对下面这个英文句子进行全面细致的语法分析。请按照以下七个部分逐一分析，并用中文准确无误的输出结果：
 1. 句子结构（简单句、复合句、复杂句等）
 2. 从句分析（如果有）
 3. 时态分析
 4. 句子成分标注（主语、谓语、宾语、定语、状语、补语、同位语等）
-5. 重要短语解析
-6. 语法要点解释
+5. 词级信息（词形还原、词性、核心语义、句中作用）
+6. 重要短语解析
+7. 语法要点解释（请附上标签）
 
 请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 {
   "structure": {
     "type": "句子类型",
-    "explanation": "详细的句子结构解释"
+    "explanation": "详细的句子结构解释",
+    "pattern": "结构公式或句型模板"
   },
   "clauses": [
     {
       "text": "从句文本",
       "type": "从句类型",
-      "function": "在句中的功能"
+      "function": "在句中的功能",
+      "connector": "连接词或引导词（如有）"
     }
   ],
   "tense": [{
@@ -72,17 +75,28 @@ export function buildAnalyzeSentencePrompt(sentence: string): string {
       "explanation": "成分解释"
     }
   ],
+  "words": [
+    {
+      "text": "原词",
+      "lemma": "词元/原形",
+      "partOfSpeech": "词性",
+      "meaning": "该词在本句中的核心含义",
+      "role": "该词在句中的作用"
+    }
+  ],
   "phrases": [
     {
       "text": "短语文本",
-      "type": "短语类型",
+      "category": "短语类别",
+      "function": "短语在句中的作用",
       "explanation": "短语解释"
     }
   ],
   "grammarPoints": [
     {
-      "point": "语法点",
-      "explanation": "语法解释"
+      "title": "语法点标题",
+      "explanation": "语法解释",
+      "tags": ["标签1", "标签2"]
     }
   ]
 }

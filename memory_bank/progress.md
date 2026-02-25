@@ -1,5 +1,33 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-s-01-sentence-contract-extension)
+
+### Completed
+- Completed `P2-S-01` (sentence analysis structure extension).
+- Backend contract upgrade:
+  - `server/src/routes/sentence.ts` now normalizes AI output to stable schema
+  - added compatibility mapping for mixed field names (`point -> title`, `type -> category`, `pos -> partOfSpeech`, etc.)
+  - added safe defaults for missing fields to avoid frontend render crashes
+- Prompt/schema upgrade:
+  - `server/src/utils/prompt-builder.ts` sentence prompt now requests:
+    - `words` (词级信息)
+    - `phrases.category/function`
+    - `grammarPoints.title/tags`
+    - `structure.pattern` and clause `connector`
+- Frontend contract + rendering upgrade:
+  - `client/src/types/index.ts` updated with normalized sentence domain models
+  - `SentenceAnalysisPage` now normalizes incoming + history data for backward compatibility
+  - added词级信息展示区，语法点标签展示，短语字段命名切换为 `category/function`
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-S-01` is complete; sentence analysis payload can be mapped stably even under partial/legacy AI responses.
+- Next step is `P2-S-02` (逐词悬停解释交互).
+
 ## 2026-02-25 (complete/p2-f-06-flashcards-regression)
 
 ### Completed

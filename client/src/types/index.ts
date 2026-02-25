@@ -15,13 +15,59 @@ export interface Word {
 }
 
 // Sentence analysis
+export interface SentenceStructure {
+  type: string;
+  explanation: string;
+  pattern: string;
+}
+
+export interface SentenceClause {
+  text: string;
+  type: string;
+  function: string;
+  connector: string;
+}
+
+export interface SentenceTense {
+  name: string;
+  explanation: string;
+}
+
+export interface SentenceComponent {
+  text: string;
+  type: string;
+  explanation: string;
+}
+
+export interface SentenceWordInfo {
+  text: string;
+  lemma: string;
+  partOfSpeech: string;
+  meaning: string;
+  role: string;
+}
+
+export interface SentencePhrase {
+  text: string;
+  category: string;
+  function: string;
+  explanation: string;
+}
+
+export interface SentenceGrammarPoint {
+  title: string;
+  explanation: string;
+  tags: string[];
+}
+
 export interface SentenceAnalysis {
-  structure: { type: string; explanation: string };
-  clauses: Array<{ text: string; type: string; function: string }>;
-  tense: Array<{ name: string; explanation: string }>;
-  components: Array<{ text: string; type: string; explanation: string }>;
-  phrases: Array<{ text: string; type: string; explanation: string }>;
-  grammarPoints: Array<{ point: string; explanation: string }>;
+  structure: SentenceStructure;
+  clauses: SentenceClause[];
+  tense: SentenceTense[];
+  components: SentenceComponent[];
+  words: SentenceWordInfo[];
+  phrases: SentencePhrase[];
+  grammarPoints: SentenceGrammarPoint[];
 }
 
 // Reading content

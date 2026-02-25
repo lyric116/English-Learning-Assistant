@@ -1,5 +1,49 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Sentence Contract Extension (`P2-S-01`)
+
+### `client/src/types/index.ts`
+- Role: sentence domain contract source for frontend.
+- Changes:
+  - sentence model refactored into explicit sub-types:
+    - `SentenceWordInfo`
+    - `SentencePhrase` (`category/function`)
+    - `SentenceGrammarPoint` (`title/tags`)
+    - clause connector + structure pattern fields
+- Architectural impact:
+  - field naming is now consistent and semantically specific, reducing ad-hoc page parsing.
+
+### `server/src/routes/sentence.ts`
+- Role: sentence analysis response normalization boundary.
+- Changes:
+  - added normalization layer that maps heterogeneous AI keys into one stable response shape
+  - supports backward-compatible key mapping:
+    - `point -> title`
+    - `type -> category` (phrases)
+    - `pos -> partOfSpeech`
+    - `word/token -> text`, etc.
+  - returns safe defaults when fields are missing to prevent client crash-on-null scenarios
+
+### `server/src/utils/prompt-builder.ts`
+- Role: sentence task output contract guidance.
+- Changes:
+  - upgraded prompt schema to request:
+    - word-level array (`words`)
+    - phrase category/function
+    - grammar tags
+    - structure pattern + clause connector
+- Architectural impact:
+  - prompt contract and route normalizer now align, reducing parse fragility.
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: sentence analysis consumer + local history viewer.
+- Changes:
+  - added client-side normalizer for API result and legacy local history records
+  - added word-level information section rendering
+  - switched phrase and grammar rendering to normalized names (`category`, `title`, `tags`)
+- Reliability impact:
+  - page rendering no longer depends on one exact AI raw key naming style.
+
 ## Update 2026-02-25: Flashcards Regression Closure (`P2-F-06`)
 
 ### `code/flashcards_regression_checklist.md`

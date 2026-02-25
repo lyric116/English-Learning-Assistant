@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Textarea';
@@ -49,6 +49,113 @@ interface AnalysisRecord {
   timestamp: number;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function readStringField(source: Record<string, unknown>, keys: string[], fallback = ''): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return fallback;
+}
+
+function readTagList(source: Record<string, unknown>): string[] {
+  const tags = source.tags ?? source.tag ?? source.labels ?? source.label;
+  if (Array.isArray(tags)) {
+    return tags
+      .map(item => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean);
+  }
+  if (typeof tags === 'string') {
+    return tags
+      .split(/[，,|/]/)
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function toObjectArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord);
+}
+
+function isSentenceAnalysisV2(value: unknown): value is SentenceAnalysis {
+  if (!isRecord(value)) return false;
+  const words = value.words;
+  const phrases = value.phrases;
+  const grammarPoints = value.grammarPoints;
+  if (!Array.isArray(words) || !Array.isArray(phrases) || !Array.isArray(grammarPoints)) return false;
+  return grammarPoints.every(item => (
+    isRecord(item)
+    && typeof item.title === 'string'
+    && Array.isArray(item.tags)
+  ));
+}
+
+function normalizeSentenceAnalysis(value: unknown): SentenceAnalysis {
+  const root = isRecord(value) ? value : {};
+  const structureSource = isRecord(root.structure) ? root.structure : {};
+
+  const structure = {
+    type: readStringField(structureSource, ['type', 'sentenceType'], '未识别句型'),
+    explanation: readStringField(structureSource, ['explanation', 'description', 'detail'], '未提供结构解释'),
+    pattern: readStringField(structureSource, ['pattern', 'formula', 'template']),
+  };
+
+  const clauses = toObjectArray(root.clauses).map(item => ({
+    text: readStringField(item, ['text', 'content']),
+    type: readStringField(item, ['type', 'clauseType']),
+    function: readStringField(item, ['function', 'role']),
+    connector: readStringField(item, ['connector', 'marker']),
+  })).filter(item => item.text || item.type || item.function || item.connector);
+
+  const tense = toObjectArray(root.tense ?? root.tenses).map(item => ({
+    name: readStringField(item, ['name', 'tense']),
+    explanation: readStringField(item, ['explanation', 'detail', 'description']),
+  })).filter(item => item.name || item.explanation);
+
+  const components = toObjectArray(root.components).map(item => ({
+    text: readStringField(item, ['text', 'content']),
+    type: readStringField(item, ['type', 'componentType']),
+    explanation: readStringField(item, ['explanation', 'detail']),
+  })).filter(item => item.text || item.type || item.explanation);
+
+  const wordsSource = root.words ?? root.wordDetails ?? root.tokens;
+  const words = toObjectArray(wordsSource).map(item => ({
+    text: readStringField(item, ['text', 'word', 'token']),
+    lemma: readStringField(item, ['lemma', 'baseForm', 'root', 'word']),
+    partOfSpeech: readStringField(item, ['partOfSpeech', 'pos', 'type']),
+    meaning: readStringField(item, ['meaning', 'definition', 'explanation']),
+    role: readStringField(item, ['role', 'function', 'usage']),
+  })).filter(item => item.text || item.lemma || item.meaning);
+
+  const phrases = toObjectArray(root.phrases).map(item => ({
+    text: readStringField(item, ['text', 'phrase']),
+    category: readStringField(item, ['category', 'type']),
+    function: readStringField(item, ['function', 'role', 'usage']),
+    explanation: readStringField(item, ['explanation', 'detail', 'meaning']),
+  })).filter(item => item.text || item.category || item.explanation);
+
+  const grammarPoints = toObjectArray(root.grammarPoints ?? root.grammar).map(item => ({
+    title: readStringField(item, ['title', 'point', 'name']),
+    explanation: readStringField(item, ['explanation', 'detail', 'description']),
+    tags: readTagList(item),
+  })).filter(item => item.title || item.explanation || item.tags.length > 0);
+
+  return {
+    structure,
+    clauses,
+    tense,
+    components,
+    words,
+    phrases,
+    grammarPoints,
+  };
+}
+
 export function SentenceAnalysisPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,6 +166,15 @@ export function SentenceAnalysisPage() {
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const hasLegacy = history.some(item => !isSentenceAnalysisV2(item.result));
+    if (!hasLegacy) return;
+    setHistory(prev => prev.map(item => ({
+      ...item,
+      result: normalizeSentenceAnalysis(item.result),
+    })));
+  }, [history, setHistory]);
+
   const analyze = async () => {
     if (!input.trim()) return;
     setErrorMessage('');
@@ -66,10 +182,11 @@ export function SentenceAnalysisPage() {
     setResult(null);
     setActiveTooltip(null);
     try {
-      const data = await api.sentence.analyze(input) as SentenceAnalysis;
-      setResult(data);
+      const data = await api.sentence.analyze(input);
+      const normalized = normalizeSentenceAnalysis(data);
+      setResult(normalized);
       setHistory(prev => [
-        { sentence: input.trim(), result: data, timestamp: Date.now() },
+        { sentence: input.trim(), result: normalized, timestamp: Date.now() },
         ...prev.filter(h => h.sentence !== input.trim()),
       ].slice(0, 3));
       toast('分析完成', 'success');
@@ -93,7 +210,7 @@ export function SentenceAnalysisPage() {
 
   const loadRecord = (record: AnalysisRecord) => {
     setInput(record.sentence);
-    setResult(record.result);
+    setResult(normalizeSentenceAnalysis(record.result));
     setActiveTooltip(null);
   };
 
@@ -162,7 +279,7 @@ export function SentenceAnalysisPage() {
         index={1}
         type="result"
         title="句子分析结果"
-        description="查看结构拆解、从句时态、短语和语法要点。"
+        description="查看结构拆解、词级信息、从句时态、短语和语法要点。"
       >
         {loading && <LoadingSpinner text="AI 正在分析句子结构..." />}
 
@@ -194,7 +311,7 @@ export function SentenceAnalysisPage() {
                 <span className="absolute bottom-1 right-3 text-3xl leading-none text-primary-300/50 dark:text-primary-600/40 font-serif select-none">"</span>
               </div>
               {result.structure && (
-                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div className="analysis-item" style={{ '--item-color': '#3b82f6' } as React.CSSProperties}>
                     <div className="flex items-center gap-1.5 mb-1">
                       <Type className="h-3.5 w-3.5 text-blue-500" />
@@ -208,6 +325,13 @@ export function SentenceAnalysisPage() {
                       <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">结构解释</p>
                     </div>
                     <p>{result.structure.explanation}</p>
+                  </div>
+                  <div className="analysis-item" style={{ '--item-color': '#14b8a6' } as React.CSSProperties}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Braces className="h-3.5 w-3.5 text-teal-500" />
+                      <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide">句型公式</p>
+                    </div>
+                    <p>{result.structure.pattern || '未返回句型公式'}</p>
                   </div>
                 </div>
               )}
@@ -270,6 +394,37 @@ export function SentenceAnalysisPage() {
               </Card>
             )}
 
+            {result.words && result.words.length > 0 && (
+              <Card>
+                <div className="analysis-card-header">
+                  <Type className="h-5 w-5 text-sky-500" />
+                  <h2 className="text-lg font-bold">词级信息</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {result.words.slice(0, 12).map((w, i) => (
+                    <div
+                      key={`${w.text}-${i}`}
+                      className="analysis-item text-sm"
+                      style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold font-serif truncate">{w.text || '-'}</p>
+                        <span className="text-xs rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-2 py-0.5">
+                          {w.partOfSpeech || '未标注'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">词元: {w.lemma || '-'}</p>
+                      <p className="text-muted-foreground mt-1">{w.meaning || '未返回词义'}</p>
+                      {w.role && <p className="text-xs text-muted-foreground mt-1">句中作用: {w.role}</p>}
+                    </div>
+                  ))}
+                </div>
+                {result.words.length > 12 && (
+                  <p className="text-xs text-muted-foreground mt-3">已展示前 12 个词级条目，共 {result.words.length} 个。</p>
+                )}
+              </Card>
+            )}
+
           {/* Clauses & Tense */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
@@ -283,6 +438,7 @@ export function SentenceAnalysisPage() {
                     <li key={i} className="analysis-item text-sm animate-slide-in" style={{ '--item-color': '#3b82f6', animationDelay: `${i * 80}ms` } as React.CSSProperties}>
                       <p className="font-semibold">{c.type}</p>
                       <p className="text-muted-foreground text-xs mt-0.5">功能: {c.function}</p>
+                      {c.connector && <p className="text-muted-foreground text-xs mt-0.5">连接词: {c.connector}</p>}
                       <p className="italic mt-1.5 text-foreground/80 font-serif">"{c.text}"</p>
                     </li>
                   ))}
@@ -324,7 +480,10 @@ export function SentenceAnalysisPage() {
                   {result.phrases.map((p, i) => (
                     <li key={i} className="analysis-item text-sm" style={{ '--item-color': '#10b981' } as React.CSSProperties}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">{p.type}</span>
+                        <span className="text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                          {p.category || '短语'}
+                        </span>
+                        {p.function && <span className="text-xs text-muted-foreground">作用: {p.function}</span>}
                       </div>
                       <p className="italic text-foreground/80 font-serif">"{p.text}"</p>
                       <p className="mt-1 text-muted-foreground">{p.explanation}</p>
@@ -345,7 +504,16 @@ export function SentenceAnalysisPage() {
                 <ul className="space-y-3">
                   {result.grammarPoints.map((g, i) => (
                     <li key={i} className="analysis-item text-sm" style={{ '--item-color': '#6366f1' } as React.CSSProperties}>
-                      <p className="font-semibold">{g.point}</p>
+                      <p className="font-semibold">{g.title || '语法点'}</p>
+                      {g.tags.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {g.tags.slice(0, 4).map(tag => (
+                            <span key={tag} className="text-[11px] rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <p className="mt-1 text-muted-foreground">{g.explanation}</p>
                     </li>
                   ))}

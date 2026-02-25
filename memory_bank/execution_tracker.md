@@ -28,7 +28,7 @@
 | 22 | P2-F-04 | completed | Implemented review queue ordering by state/time: due + reviewing words prioritized ahead of new/mastered entries, while preserving source data updates through index mapping. |
 | 23 | P2-F-05 | completed | Added flashcard session summary (`studied/accuracy/due`) persistence and achievements integration (history panel + report payload + share text). |
 | 24 | P2-F-06 | completed | Flashcards regression checklist executed (`code/flashcards_regression_checklist.md`) + validation gates passed (`cd client && npm run lint`, `npm run build`). |
-| 25 | P2-S-01 | pending | Not started. |
+| 25 | P2-S-01 | completed | Extended sentence analysis contract with word-level data, phrase category/function, grammar tags, and server/client normalization for backward compatibility. |
 | 26 | P2-S-02 | pending | Not started. |
 | 27 | P2-S-03 | pending | Not started. |
 | 28 | P2-S-04 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-S-01`.
+- First not-yet-completed step: `P2-S-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

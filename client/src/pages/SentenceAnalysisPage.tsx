@@ -117,6 +117,7 @@ export function SentenceAnalysisPage() {
       )}
 
       <ModuleSection
+        index={0}
         type="input"
         title="输入待分析句子"
         description="支持手动输入或使用示例句，按回车即可触发分析。"
@@ -133,7 +134,7 @@ export function SentenceAnalysisPage() {
             {input && (
               <button
                 onClick={() => setInput('')}
-                className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
+                className="tap-target absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -158,6 +159,7 @@ export function SentenceAnalysisPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={1}
         type="result"
         title="句子分析结果"
         description="查看结构拆解、从句时态、短语和语法要点。"
@@ -173,7 +175,7 @@ export function SentenceAnalysisPage() {
         )}
 
         {result && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-soft-pop">
           {/* Structure */}
             <Card className="analysis-highlight-card pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -257,7 +259,7 @@ export function SentenceAnalysisPage() {
                         </div>
                         <button
                           onClick={() => setActiveTooltip(null)}
-                          className="p-1.5 rounded-full hover:bg-background/80 transition-colors text-muted-foreground shrink-0"
+                          className="tap-target p-1.5 rounded-full hover:bg-background/80 transition-colors text-muted-foreground shrink-0"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -358,6 +360,7 @@ export function SentenceAnalysisPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={2}
         type="history"
         title="最近分析历史"
         description="保留最近 3 条分析记录，可一键重新加载。"
@@ -391,6 +394,7 @@ export function SentenceAnalysisPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={3}
         type="action"
         title="分析操作"
         description="快速重跑分析、复制结果或重置历史。"

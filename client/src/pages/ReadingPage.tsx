@@ -103,6 +103,7 @@ export function ReadingPage() {
       )}
 
       <ModuleSection
+        index={0}
         type="input"
         title="输入阅读素材"
         description="输入中英文文本并选择转换方向。"
@@ -118,7 +119,7 @@ export function ReadingPage() {
             {inputText && (
               <button
                 onClick={() => setInputText('')}
-                className="absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
+                className="tap-target absolute top-2 right-2 p-1 rounded-full text-muted-foreground hover:bg-muted transition"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -141,6 +142,7 @@ export function ReadingPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={1}
         type="result"
         title="阅读结果"
         description="查看双语内容与重点词汇。"
@@ -156,7 +158,7 @@ export function ReadingPage() {
         )}
 
         {reading && !loading && (
-          <div className="animate-fade-in-up">
+          <div className="animate-soft-pop">
             <Card className="analysis-highlight-card pt-6 mb-6">
               {reading.title && (
                 <h2 className="typo-h2 mb-4 pb-3 border-b border-border/50 break-words">
@@ -212,7 +214,7 @@ export function ReadingPage() {
                         <p className="font-bold text-primary-600 dark:text-primary-400">{v.word}</p>
                         <button
                           onClick={() => speak(v.word)}
-                          className="p-1 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary-500"
+                          className="tap-target p-1 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary-500"
                           title="朗读单词"
                         >
                           <Volume2 className="h-3.5 w-3.5" />
@@ -233,6 +235,7 @@ export function ReadingPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={2}
         type="history"
         title="阅读历史 / 收藏"
         description="收藏的阅读可随时回放并继续用于测验。"
@@ -269,7 +272,7 @@ export function ReadingPage() {
                       </div>
                       <button
                         onClick={e => { e.stopPropagation(); removeFavorite(fav); }}
-                        className="p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                        className="tap-target p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
                         title="移除收藏"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -288,6 +291,7 @@ export function ReadingPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={3}
         type="action"
         title="阅读操作"
         description="切换视图、朗读、收藏与进入测验。"

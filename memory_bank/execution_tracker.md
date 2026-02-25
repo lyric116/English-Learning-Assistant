@@ -21,7 +21,7 @@
 | 15 | P1-07 | completed | Navigation and page shell refactored: Navbar/Footer/Layout spacing and layering unified, mobile menu overlay/collapse improved, settings entry stable on both desktop and mobile. |
 | 16 | P1-08 | completed | Homepage information architecture upgraded: stronger product positioning, dual CTA hierarchy, explicit five-module entry map, and guided learning path blocks. |
 | 17 | P1-09 | completed | Five-module framework unified with shared section scaffold (`输入区/结果区/历史区/操作区`) and consistent ordering across Flashcards/Sentence/Reading/Quiz/Achievements. |
-| 18 | P1-10 | pending | Not started. |
+| 18 | P1-10 | completed | Added key motion polish (`ModuleSection` stagger + result soft-pop) and mobile tap-target upgrades on high-frequency icon controls across modules. |
 | 19 | P2-F-01 | pending | Not started. |
 | 20 | P2-F-02 | pending | Not started. |
 | 21 | P2-F-03 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P1-10`.
+- First not-yet-completed step: `P2-F-01`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

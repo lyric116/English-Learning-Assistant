@@ -125,6 +125,7 @@ export function FlashcardsPage() {
       )}
 
       <ModuleSection
+        index={0}
         type="input"
         title="输入学习文本"
         description="粘贴英文素材并选择词汇难度，系统将自动提取可学习单词。"
@@ -156,6 +157,7 @@ export function FlashcardsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={1}
         type="result"
         title="闪卡学习结果"
         description="翻转查看释义、词源和例句，支持键盘与手势切换。"
@@ -171,7 +173,7 @@ export function FlashcardsPage() {
         )}
 
         {words.length > 0 && !loading && word && (
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center animate-soft-pop">
             <div className="relative w-full flex justify-center mb-6" style={{ maxWidth: 520 }}>
               <button
                 className="flashcard-nav-arrow left"
@@ -202,7 +204,7 @@ export function FlashcardsPage() {
                         <div className="w-12 h-0.5 bg-primary-300/50 dark:bg-primary-600/50 rounded-full my-2" />
                         <p className="text-lg text-muted-foreground font-light tracking-wide">{word.phonetic}</p>
                         <button
-                          className="mt-3 p-3 rounded-full hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                          className="tap-target mt-3 p-2.5 rounded-full hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                           onClick={e => { e.stopPropagation(); speak(word.word); }}
                           aria-label="朗读单词"
                         >
@@ -220,7 +222,7 @@ export function FlashcardsPage() {
                             <p className="text-sm text-muted-foreground mt-0.5">{word.phonetic}</p>
                           </div>
                           <button
-                            className="shrink-0 p-2 rounded-full hover:bg-muted transition-colors"
+                            className="tap-target shrink-0 p-1.5 rounded-full hover:bg-muted transition-colors"
                             onClick={e => { e.stopPropagation(); speak(word.example || word.word); }}
                             aria-label="朗读例句"
                           >
@@ -299,6 +301,7 @@ export function FlashcardsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={2}
         type="history"
         title="词卡历史"
         description="自动保存最近一次词卡集合，刷新后可继续学习。"
@@ -329,6 +332,7 @@ export function FlashcardsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={3}
         type="action"
         title="学习操作"
         description="快速控制当前词卡会话。"

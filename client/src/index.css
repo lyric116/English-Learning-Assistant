@@ -187,6 +187,7 @@
 
 .module-section-shell {
   margin-bottom: var(--ds-space-8);
+  animation: fadeInUp 0.35s var(--ds-ease-standard) both;
 }
 .module-section-label {
   display: inline-flex;
@@ -265,6 +266,14 @@
   animation: fadeInUp 0.4s ease-out both;
 }
 
+@keyframes softPopIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-soft-pop {
+  animation: softPopIn 0.32s var(--ds-ease-standard) both;
+}
+
 /* Staggered list animation */
 @keyframes slideIn {
   from { opacity: 0; transform: translateX(-12px); }
@@ -280,6 +289,18 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.tap-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 768px) {
+  .tap-target {
+    min-width: 40px;
+    min-height: 40px;
   }
 }
 

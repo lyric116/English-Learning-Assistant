@@ -149,6 +149,7 @@ export function QuizPage() {
       )}
 
       <ModuleSection
+        index={0}
         type="input"
         title="选择测试输入"
         description="先确定测试来源与题型。"
@@ -220,6 +221,7 @@ export function QuizPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={1}
         type="result"
         title="测试结果"
         description="完成答题并查看分数与错题回顾。"
@@ -227,7 +229,7 @@ export function QuizPage() {
         {loading && <LoadingSpinner text="AI 正在生成测试题..." />}
 
         {phase === 'quiz' && q && (
-          <div>
+          <div className="animate-soft-pop">
             <div className="mb-5">
               <div className="flex justify-between text-sm text-muted-foreground mb-1.5">
                 <span>问题 {qIndex + 1} / {questions.length}</span>
@@ -304,7 +306,7 @@ export function QuizPage() {
         )}
 
         {phase === 'result' && (
-          <div className="animate-fade-in-up">
+          <div className="animate-soft-pop">
             <Card className="analysis-highlight-card pt-6 text-center mb-6">
               <p className="text-4xl mb-2">{scoreEmoji}</p>
               <h2 className="typo-h2 mb-1">
@@ -390,6 +392,7 @@ export function QuizPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={2}
         type="history"
         title="测试历史"
         description="最近测验会保存在本地，便于持续追踪。"
@@ -412,6 +415,7 @@ export function QuizPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={3}
         type="action"
         title="测试操作"
         description="在不同阶段快速切换下一步动作。"

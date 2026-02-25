@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-10-motion-and-responsive-polish)
+
+### Completed
+- Completed `P1-10` (key motion + responsive detail polish).
+- Motion enhancements:
+  - added `animate-soft-pop` result reveal animation for key result containers
+  - added staggered section reveal via `ModuleSection` (`index`-driven animation delay)
+  - retained reduced-motion safety under existing `prefers-reduced-motion` guard
+- Responsive tap-target enhancements:
+  - added global `.tap-target` utility with mobile minimum hit area (`40x40`)
+  - applied to high-frequency icon-only controls in flashcards/sentence/reading/achievements flows
+- Structural polish:
+  - finished P1 framework loop by applying section order scaffold to all module pages with consistent animation rhythm
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-10` is complete; Phase 1 UI-system steps (`P1-01` ~ `P1-10`) are now fully closed.
+- Next pointer moves to `P2-F-01` (flashcards data model extension).
+
 ## 2026-02-25 (complete/p1-09-module-framework-unification)
 
 ### Completed

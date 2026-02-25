@@ -1,5 +1,31 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Motion & Responsive Polish (`P1-10`)
+
+### `client/src/index.css`
+- Role: global motion/responsive utility host.
+- Changes:
+  - added `animate-soft-pop` keyframe utility for result reveal
+  - `module-section-shell` now uses unified enter animation
+  - added `.tap-target` utility with mobile minimum hit-area (`40x40`)
+
+### `client/src/components/layout/ModuleSection.tsx`
+- Role: section scaffold animation coordinator.
+- Changes:
+  - added `index` prop to drive per-section staggered animation delay
+  - keeps zone transition rhythm consistent across all module pages
+
+### `client/src/pages/FlashcardsPage.tsx`
+### `client/src/pages/SentenceAnalysisPage.tsx`
+### `client/src/pages/ReadingPage.tsx`
+### `client/src/pages/QuizPage.tsx`
+### `client/src/pages/AchievementsPage.tsx`
+- Role: business-module interaction surfaces.
+- Changes:
+  - applied section-level stagger order (`index`)
+  - applied result reveal animation (`animate-soft-pop`) to core result blocks
+  - applied `.tap-target` to high-frequency icon controls for better mobile touch reliability
+
 ## Update 2026-02-25: Five-Module Framework Unification (`P1-09`)
 
 ### `client/src/components/layout/ModuleSection.tsx`

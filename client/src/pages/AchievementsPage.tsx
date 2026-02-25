@@ -100,6 +100,7 @@ export function AchievementsPage() {
       )}
 
       <ModuleSection
+        index={0}
         type="input"
         title="设置报告输入"
         description="选择报告周期并生成学习报告。"
@@ -140,6 +141,7 @@ export function AchievementsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={1}
         type="result"
         title="报告结果"
         description="查看学习统计、优势弱项与学习建议。"
@@ -155,7 +157,7 @@ export function AchievementsPage() {
         )}
 
         {report && !loading && (
-          <div className="space-y-6 animate-fade-in-up">
+          <div className="space-y-6 animate-soft-pop">
             <Card className="analysis-highlight-card pt-6">
               <h2 className="text-xl font-bold">{report.title}</h2>
               <p className="text-sm text-muted-foreground mb-3">{report.period}</p>
@@ -253,6 +255,7 @@ export function AchievementsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={2}
         type="history"
         title="学习历史"
         description="查看关键学习统计与历史报告。"
@@ -292,6 +295,7 @@ export function AchievementsPage() {
       </ModuleSection>
 
       <ModuleSection
+        index={3}
         type="action"
         title="报告操作"
         description="快速执行分享与重算。"
@@ -320,7 +324,7 @@ export function AchievementsPage() {
         <div className="bg-card p-6 rounded-xl shadow-2xl max-w-md w-full mx-4 modal-content" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold">分享学习成就</h3>
-            <button onClick={() => setShowShare(false)} className="p-1 rounded-full hover:bg-muted transition">
+            <button onClick={() => setShowShare(false)} className="tap-target p-1 rounded-full hover:bg-muted transition">
               <X className="h-5 w-5" />
             </button>
           </div>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Keyboard, History, Sparkles, Wrench } from 'lucide-react';
 
@@ -9,6 +9,7 @@ interface ModuleSectionProps {
   title: string;
   description?: string;
   className?: string;
+  index?: number;
   children: ReactNode;
 }
 
@@ -19,12 +20,15 @@ const sectionMeta: Record<ModuleSectionType, { label: string; icon: typeof Spark
   action: { label: '操作区', icon: Wrench },
 };
 
-export function ModuleSection({ type, title, description, className, children }: ModuleSectionProps) {
+export function ModuleSection({ type, title, description, className, index, children }: ModuleSectionProps) {
   const meta = sectionMeta[type];
   const Icon = meta.icon;
+  const style: CSSProperties | undefined = typeof index === 'number'
+    ? { animationDelay: `${index * 70}ms` }
+    : undefined;
 
   return (
-    <section className={cn('module-section-shell', className)}>
+    <section className={cn('module-section-shell', className)} style={style}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="module-section-label">

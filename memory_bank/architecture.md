@@ -1,5 +1,18 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Database Model Design (`P3-03`)
+
+### `code/database_model_design.md`
+- Role: persistence schema baseline for Phase 3 backend migration.
+- Contents:
+  - unified ownership model (`owner_type + owner_id`) for anonymous/user coexistence
+  - table schema definitions for all five modules plus session/user layers
+  - index strategy per table aligned to high-frequency query paths
+  - module query-to-index mapping and retention guidance
+
+### Architectural Impact
+- Establishes a concrete data persistence contract for migration scripts (`P3-04`) and repository abstraction (`P3-05`), reducing schema drift risk across implementation phases.
+
 ## Update 2026-02-25: Session Token Flow Design (`P3-02`)
 
 ### `code/session_token_flow_design.md`

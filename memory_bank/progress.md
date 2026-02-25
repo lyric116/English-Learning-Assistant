@@ -1,5 +1,24 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-03-database-model-design)
+
+### Completed
+- Completed `P3-03` (数据库模型设计).
+- Added model doc: `code/database_model_design.md`.
+- Design coverage:
+  - 用户/会话层（users/sessions）
+  - 五大模块主数据表（flashcards/sentence/readings/quiz/report）
+  - 错题本与会话统计等关键辅助表
+  - 匿名/登录统一归属模型（`owner_type + owner_id`）
+  - 核心索引策略与查询场景映射
+
+### Validation Performed
+- 文档检查：五大模块核心查询场景均有对应表与索引策略 ✅
+
+### Notes For Next Developer
+- `P3-03` is complete; schema baseline is ready for migration workflow implementation.
+- Next step is `P3-04` (迁移机制落地：可重复执行迁移流程).
+
 ## 2026-02-25 (complete/p3-02-session-token-flow)
 
 ### Completed

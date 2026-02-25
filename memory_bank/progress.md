@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-02-typography-hierarchy)
+
+### Completed
+- Completed `P1-02` (typography hierarchy normalization).
+- Added typography token variables and shared classes in `client/src/index.css`:
+  - size tokens for display/h1/h2/h3/body-lg/body/body-sm/label
+  - line-height tokens (`tight/heading/body/dense`)
+  - reusable classes (`.typo-display`, `.typo-h*`, `.typo-body*`, `.typo-label`)
+- Replaced scattered text sizing in key pages:
+  - Home: hero title/body, feature card title/body, step title/body
+  - Reading: article title, EN/ZH paragraph body, vocabulary title/body, favorites title
+  - Quiz: selection card title/body, question title, result title, review title
+- Added `break-words` to long textual blocks in Reading/Quiz to reduce mobile overflow risk.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `npm run build` ✅
+
+### Notes For Next Developer
+- `P1-02` is completed on top of P1 token baseline.
+- Next step is `P1-03` (contrast audit for light/dark readability).
+
 ## 2026-02-25 (complete/p1-01-design-tokens)
 
 ### Completed

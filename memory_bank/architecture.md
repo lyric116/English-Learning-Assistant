@@ -1,5 +1,30 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Typography Hierarchy (`P1-02`)
+
+### `client/src/index.css`
+- Added typography token layer:
+  - font-size tokens (`display/h1/h2/h3/body-lg/body/body-sm/label`)
+  - line-height tokens (`tight/heading/body/dense`)
+- Added reusable typography classes:
+  - `.typo-display`
+  - `.typo-h1`, `.typo-h2`, `.typo-h3`
+  - `.typo-body-lg`, `.typo-body`, `.typo-body-sm`
+  - `.typo-label`
+- Result: title/body semantics are now centralized instead of page-level ad-hoc text classes.
+
+### `client/src/pages/HomePage.tsx`
+- Hero, feature cards, and onboarding blocks now consume standardized typography classes.
+- This page becomes the reference implementation for marketing/info hierarchy.
+
+### `client/src/pages/ReadingPage.tsx`
+- Reading title, bilingual paragraph body, and vocabulary section typography are standardized.
+- Added `break-words` on long text blocks to improve small-screen robustness.
+
+### `client/src/pages/QuizPage.tsx`
+- Question titles, result titles, and review headers now use the standardized hierarchy.
+- Improves consistency between practice and result phases.
+
 ## Update 2026-02-25: Design Token Foundation (`P1-01`)
 
 ### `client/src/index.css`

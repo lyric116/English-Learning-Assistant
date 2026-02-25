@@ -157,9 +157,9 @@ export function QuizPage() {
                   <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
                     <BookOpen className="h-6 w-6" />
                   </div>
-                  <h2 className="text-xl font-bold">阅读理解测试</h2>
+                  <h2 className="typo-h3">阅读理解测试</h2>
                 </div>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground typo-body-sm">
                   根据阅读内容生成理解题目，测试你对文章的理解程度。
                 </p>
               </Card>
@@ -171,9 +171,9 @@ export function QuizPage() {
                   <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform">
                     <Type className="h-6 w-6" />
                   </div>
-                  <h2 className="text-xl font-bold">词汇测试</h2>
+                  <h2 className="typo-h3">词汇测试</h2>
                 </div>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground typo-body-sm">
                   根据学习的词汇生成测试题，检验词汇掌握情况。
                 </p>
               </Card>
@@ -217,7 +217,7 @@ export function QuizPage() {
           </div>
 
           <Card className="analysis-highlight-card pt-6 mb-4">
-            <p className="font-semibold text-lg mb-5">{q.question}</p>
+            <p className="typo-h3 mb-5 break-words">{q.question}</p>
             <div className="space-y-3">
               {q.options.map((opt, i) => {
                 const isSelected = userAnswers[qIndex] === i;
@@ -278,7 +278,7 @@ export function QuizPage() {
         <div className="animate-fade-in-up">
           <Card className="analysis-highlight-card pt-6 text-center mb-6">
             <p className="text-4xl mb-2">{scoreEmoji}</p>
-            <h2 className="text-2xl font-bold mb-1">
+            <h2 className="typo-h2 mb-1">
               {testType === 'reading' ? '阅读理解测试' : '词汇测试'} 完成
             </h2>
             <p className={cn('text-6xl font-bold my-6', scoreColor)}>{score}%</p>
@@ -327,7 +327,7 @@ export function QuizPage() {
             <div className="space-y-4">
               <div className="analysis-card-header">
                 <XCircle className="h-5 w-5 text-red-500" />
-                <h3 className="font-bold text-lg">错题回顾</h3>
+                <h3 className="typo-h3">错题回顾</h3>
               </div>
               {wrongQuestions.map((wq, i) => (
                 <Card key={i} className="border-red-200 dark:border-red-900/50">

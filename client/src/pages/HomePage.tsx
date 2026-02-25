@@ -69,10 +69,10 @@ export function HomePage() {
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300 text-sm font-medium mb-6">
           <Sparkles className="h-3.5 w-3.5" /> AI 驱动的英语学习助手
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+        <h1 className="typo-display mb-4 bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
           提升你的英语能力
         </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+        <p className="typo-body-lg text-muted-foreground max-w-2xl mx-auto">
           通过闪卡学习、双语阅读、理解测试和成就系统，让英语学习变得更加高效和有趣。
         </p>
         <div className="mt-8">
@@ -96,13 +96,13 @@ export function HomePage() {
               <div className={`p-2.5 rounded-lg ${f.color} group-hover:scale-110 transition-transform`}>
                 <f.icon className="h-5 w-5" />
               </div>
-              <h2 className="text-xl font-bold">{f.title}</h2>
+              <h2 className="typo-h3">{f.title}</h2>
             </div>
-            <p className="text-muted-foreground text-sm mb-4 leading-relaxed">{f.desc}</p>
+            <p className="text-muted-foreground typo-body-sm mb-4">{f.desc}</p>
             {f.to ? (
               <Link
                 to={f.to}
-                className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:gap-2 transition-all font-semibold text-sm"
+                className="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:gap-2 transition-all font-semibold typo-body-sm"
               >
                 {f.action} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
@@ -117,15 +117,15 @@ export function HomePage() {
 
       {/* How to use */}
       <section className="ds-glass-panel p-8 md:p-10 mb-12 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-        <h2 className="text-2xl font-bold mb-8 text-center">如何使用</h2>
+        <h2 className="typo-h2 mb-8 text-center">如何使用</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {steps.map((s, i) => (
             <div key={s.num} className="relative bg-card p-5 home-step-card">
               <div className="flex justify-center items-center h-10 w-10 rounded-full bg-primary-500 text-white mb-4 mx-auto font-bold">
                 {s.num}
               </div>
-              <h3 className="text-lg font-semibold text-center mb-2">{s.title}</h3>
-              <p className="text-muted-foreground text-center text-sm">{s.desc}</p>
+              <h3 className="typo-h3 text-center mb-2">{s.title}</h3>
+              <p className="text-muted-foreground text-center typo-body-sm">{s.desc}</p>
               {i < steps.length - 1 && (
                 <ArrowRight className="hidden lg:block absolute -right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/30" />
               )}

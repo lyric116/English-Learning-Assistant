@@ -142,7 +142,7 @@ export function ReadingPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{fav.title || '无标题'}</p>
+                      <p className="typo-h3 truncate">{fav.title || '无标题'}</p>
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-serif italic">
                         {fav.english.slice(0, 120)}{fav.english.length > 120 ? '...' : ''}
                       </p>
@@ -214,7 +214,7 @@ export function ReadingPage() {
           {/* Reading content */}
           <Card className="analysis-highlight-card pt-6 mb-6">
             {reading.title && (
-              <h2 className="text-xl font-bold mb-4 pb-3 border-b border-border/50">
+              <h2 className="typo-h2 mb-4 pb-3 border-b border-border/50 break-words">
                 {reading.title}
               </h2>
             )}
@@ -222,8 +222,8 @@ export function ReadingPage() {
               <div className="space-y-4">
                 {enParagraphs.map((p, i) => (
                   <div key={i} className="group">
-                    <p className="text-lg leading-relaxed font-serif">{p}</p>
-                    <p className="text-base text-muted-foreground leading-relaxed mt-1 pl-3 border-l-2 border-primary-200 dark:border-primary-800">
+                    <p className="typo-body-lg font-serif break-words">{p}</p>
+                    <p className="typo-body text-muted-foreground mt-1 pl-3 border-l-2 border-primary-200 dark:border-primary-800 break-words">
                       {zhParagraphs[i] || ''}
                     </p>
                   </div>
@@ -232,15 +232,15 @@ export function ReadingPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-primary-500 mb-2">English</p>
+                  <p className="typo-label text-primary-500 mb-2">English</p>
                   {enParagraphs.map((p, i) => (
-                    <p key={i} className="text-lg leading-relaxed font-serif">{p}</p>
+                    <p key={i} className="typo-body-lg font-serif break-words">{p}</p>
                   ))}
                 </div>
                 <div className="space-y-4 md:border-l md:border-border/50 md:pl-6">
-                  <p className="text-xs font-bold uppercase tracking-wider text-primary-500 mb-2">中文</p>
+                  <p className="typo-label text-primary-500 mb-2">中文</p>
                   {zhParagraphs.map((p, i) => (
-                    <p key={i} className="text-base text-muted-foreground leading-relaxed">{p}</p>
+                    <p key={i} className="typo-body text-muted-foreground break-words">{p}</p>
                   ))}
                 </div>
               </div>
@@ -253,7 +253,7 @@ export function ReadingPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="analysis-card-header !mb-0">
                   <Languages className="h-5 w-5 text-emerald-500" />
-                  <h3 className="font-bold">重点词汇</h3>
+                  <h3 className="typo-h3">重点词汇</h3>
                 </div>
                 <span className="text-xs text-muted-foreground">{reading.vocabulary.length} 个词汇</span>
               </div>
@@ -275,9 +275,9 @@ export function ReadingPage() {
                       </button>
                     </div>
                     {v.phonetic && <p className="text-xs text-muted-foreground">{v.phonetic}</p>}
-                    <p className="text-sm mt-1">{v.meaning}</p>
+                    <p className="typo-body-sm mt-1">{v.meaning}</p>
                     {v.example && (
-                      <p className="text-sm italic mt-1 text-muted-foreground font-serif">{v.example}</p>
+                      <p className="typo-body-sm italic mt-1 text-muted-foreground font-serif">{v.example}</p>
                     )}
                   </div>
                 ))}

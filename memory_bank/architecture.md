@@ -1,5 +1,25 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Sentence Regression Closure (`P2-S-05`)
+
+### `code/sentence_regression_checklist.md`
+- Role: sentence module regression execution record.
+- Scope captured:
+  - input/analyze flow
+  - contract normalization stability
+  - word hover panel
+  - grammar-phrase linkage
+  - study-note export + history persistence
+  - error feedback and recovery
+- Gate evidence:
+  - `cd server && npm run build`
+  - `cd client && npm run lint`
+  - `cd client && npm run build`
+
+### Reliability Impact
+- Sentence module step set (`P2-S-01` ~ `P2-S-05`) now has a complete closure artifact chain.
+- Future sentence regressions can be audited against a single checklist baseline.
+
 ## Update 2026-02-25: Sentence Study Note Export (`P2-S-04`)
 
 ### `client/src/pages/SentenceAnalysisPage.tsx`

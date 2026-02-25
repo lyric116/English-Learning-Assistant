@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-s-05-sentence-regression)
+
+### Completed
+- Completed `P2-S-05` (句子模块回归测试).
+- Added sentence regression artifact: `code/sentence_regression_checklist.md`.
+- Regression scope explicitly covers:
+  - 输入与分析触发
+  - 返回结构映射稳定性
+  - 逐词解释交互
+  - 语法点联动高亮
+  - 学习笔记导出与笔记历史
+  - 错误提示与恢复路径
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-S-05` is complete; sentence phase (`P2-S-01` ~ `P2-S-05`) is now fully closed.
+- Next step is `P2-R-01` (阅读模块参数扩展).
+
 ## 2026-02-25 (complete/p2-s-04-study-note-export)
 
 ### Completed

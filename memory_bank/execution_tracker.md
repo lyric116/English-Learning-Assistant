@@ -32,7 +32,7 @@
 | 26 | P2-S-02 | completed | Implemented in-sentence token hover/click explanation panel (word meaning/POS/role) with closable detail state and legacy-safe token matching. |
 | 27 | P2-S-03 | completed | Added grammar-point click linkage: associated phrases are highlighted and a dedicated explanation panel displays active grammar details + linked snippets. |
 | 28 | P2-S-04 | completed | Added sentence study-note export (readable text format), clipboard copy flow, and persisted note history (`sentenceNotesHistory`) with replay/clear actions. |
-| 29 | P2-S-05 | pending | Not started. |
+| 29 | P2-S-05 | completed | Sentence regression checklist executed (`code/sentence_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
 | 30 | P2-R-01 | pending | Not started. |
 | 31 | P2-R-02 | pending | Not started. |
 | 32 | P2-R-03 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-S-05`.
+- First not-yet-completed step: `P2-R-01`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

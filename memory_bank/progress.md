@@ -1,5 +1,24 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-04-button-system-unification)
+
+### Completed
+- Completed `P1-04` (button style unification).
+- Refactored shared `Button` component to standardize:
+  - primary / secondary / destructive / ghost variants
+  - consistent hover/active/disabled/focus-visible states
+  - normalized button heights across `sm/md/lg`
+- Introduced `secondary` as the canonical secondary action variant, and migrated page usages from `outline` to `secondary`.
+- Removed remaining page-level style override on homepage primary CTA to keep button behavior sourced from the shared component.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-04` is complete; shared button behavior is now centrally controlled in `client/src/components/ui/Button.tsx`.
+- Next step is `P1-05` (input component style unification).
+
 ## 2026-02-25 (followup/p1-03-all-module-reconciliation)
 
 ### Completed

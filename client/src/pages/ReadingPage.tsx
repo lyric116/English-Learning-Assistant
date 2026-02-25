@@ -180,14 +180,14 @@ export function ReadingPage() {
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
             <Button
-              variant="outline" size="sm"
+              variant="secondary" size="sm"
               onClick={() => setViewMode(v => v === 'alternate' ? 'parallel' : 'alternate')}
             >
               <ArrowLeftRight className="h-4 w-4 mr-1.5" />
               {viewMode === 'alternate' ? '并排视图' : '交替视图'}
             </Button>
             <Button
-              variant="outline" size="sm"
+              variant="secondary" size="sm"
               onClick={() => speak(reading.english)}
               disabled={speaking}
             >
@@ -206,7 +206,7 @@ export function ReadingPage() {
                 : <><Bookmark className="h-4 w-4 mr-1.5" />收藏</>
               }
             </Button>
-            <Button variant="outline" size="sm" onClick={goToQuiz}>
+            <Button variant="secondary" size="sm" onClick={goToQuiz}>
               <FileQuestion className="h-4 w-4 mr-1.5" /> 生成测试
             </Button>
           </div>

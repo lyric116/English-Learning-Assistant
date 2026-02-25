@@ -197,7 +197,7 @@ export function SettingsDialog({ open, onClose }: Props) {
 
         {/* Actions */}
         <div className="flex items-center gap-2 mt-6">
-          <Button variant="outline" size="sm" onClick={handleTest} loading={testing}>
+          <Button variant="secondary" size="sm" onClick={handleTest} loading={testing}>
             <Zap className="h-4 w-4" />
             测试连接
           </Button>

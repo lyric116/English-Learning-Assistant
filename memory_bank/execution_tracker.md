@@ -15,7 +15,7 @@
 | 9 | P1-01 | completed | Added global design tokens in `client/src/index.css` and applied them in Home + Flashcards + Navbar layers. |
 | 10 | P1-02 | completed | Added typography hierarchy tokens/classes and applied to Home/Reading/Quiz headings and body text. |
 | 11 | P1-03 | completed | Contrast audit reconciled across all modules; key readability texts/buttons fixed in Home/Flashcards/Sentence/Reading/Quiz (light/dark). |
-| 12 | P1-04 | pending | Not started. |
+| 12 | P1-04 | completed | Button system unified: primary/secondary/destructive/disabled interaction rules standardized and outline usage migrated. |
 | 13 | P1-05 | pending | Not started. |
 | 14 | P1-06 | pending | Not started. |
 | 15 | P1-07 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P1-04`.
+- First not-yet-completed step: `P1-05`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

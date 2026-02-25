@@ -77,7 +77,7 @@ export function HomePage() {
         </p>
         <div className="mt-8">
           <Link to="/flashcards">
-            <Button size="lg" className="transition-shadow">
+            <Button size="lg">
               开始学习 <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           </Link>

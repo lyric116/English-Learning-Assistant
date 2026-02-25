@@ -1,5 +1,41 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Button System Unification (`P1-04`)
+
+### `client/src/components/ui/Button.tsx`
+- Role: single source of truth for all shared CTA/button interactions.
+- Changes:
+  - standardized variants: `default` (primary), `secondary`, `destructive`, `ghost`
+  - preserved `outline` as compatibility alias while migrating usages to `secondary`
+  - unified focus-visible ring, hover/active transitions, and disabled behavior
+  - normalized heights for `sm/md/lg` to remove page-level size drift
+
+### `client/src/pages/ReadingPage.tsx`
+- Role: reading workflow actions (view toggle, speak, favorite, generate quiz).
+- Changes:
+  - migrated secondary actions from `outline` to shared `secondary` variant
+  - keeps all button interactions aligned with global button system
+
+### `client/src/pages/QuizPage.tsx`
+- Role: quiz result/review actions.
+- Changes:
+  - migrated review/reset actions from `outline` to shared `secondary` variant
+
+### `client/src/components/settings/AIConfigBanner.tsx`
+- Role: AI setup entry-point action.
+- Changes:
+  - migrated configuration entry button from `outline` to shared `secondary` variant
+
+### `client/src/components/settings/SettingsDialog.tsx`
+- Role: settings control actions (test/save/clear).
+- Changes:
+  - migrated connection test action from `outline` to shared `secondary` variant
+
+### `client/src/pages/HomePage.tsx`
+- Role: top-level conversion CTA.
+- Changes:
+  - removed page-specific transition override; CTA now fully inherits shared button behavior
+
 ## Update 2026-02-25: `P1-03` Reconciliation Across All Modules
 
 ### `client/src/pages/ReadingPage.tsx`

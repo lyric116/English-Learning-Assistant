@@ -308,12 +308,12 @@ export function QuizPage() {
 
             <div className="flex flex-wrap justify-center gap-3">
               {wrongCount > 0 && (
-                <Button variant="outline" onClick={() => setShowReview(!showReview)}>
+                <Button variant="secondary" onClick={() => setShowReview(!showReview)}>
                   <AlertTriangle className="h-4 w-4 mr-1.5" />
                   {showReview ? '收起错题' : `查看错题 (${wrongCount})`}
                 </Button>
               )}
-              <Button variant="outline" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); }}>
+              <Button variant="secondary" onClick={() => { setPhase('select'); setQuestions([]); setShowReview(false); }}>
                 <RotateCcw className="h-4 w-4 mr-1.5" /> 重新选择
               </Button>
               <Button onClick={() => navigate('/achievements')}>

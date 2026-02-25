@@ -1,5 +1,29 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-a-02-trend-suggestions)
+
+### Completed
+- Completed `P2-A-02` (趋势统计与个性化建议增强).
+- Achievements trend pipeline:
+  - added 7-day window comparison metrics:
+    - 学习频次（学习事件次数）
+    - 测试正确率（按测试历史得分均值）
+    - 新增错题（按 `wrongQuestionBook.firstWrongAt`）
+  - each metric now shows direction (`上升/下降/稳定`) and delta description versus previous 7-day window
+- Personalized suggestion pipeline:
+  - added data-driven recommendation block on report view
+  - suggestion rules now combine trend metrics,错题本规模、闪卡待复习量、报告弱项与模板类型（冲刺/职场） to output actionable next steps
+- Template-switch compatibility hardening:
+  - report history reload now restores template context and backfills missing template profile structure
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-A-02` is complete with deterministic trend metrics and data-driven recommendation output.
+- Next step is `P2-A-03` (升级结构化分享内容：标题/摘要/关键指标).
+
 ## 2026-02-25 (complete/p2-a-01-report-template-expansion)
 
 ### Completed

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,14 +15,39 @@ import {
   ThumbsUp, AlertTriangle, Lightbulb, Share2,
   X, BarChart3,
 } from 'lucide-react';
-import type { FlashcardSessionSummary, LearningReport, Word, ReadingContent, TestResult, WrongQuestionRecord } from '@/types';
+import type {
+  FlashcardSessionSummary,
+  LearningReport,
+  LearningReportTemplateProfile,
+  ReportTemplateType,
+  Word,
+  ReadingContent,
+  TestResult,
+  WrongQuestionRecord,
+} from '@/types';
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
-const reportTypes = [
+const reportTypes: Array<{ value: ReportTemplateType; label: string; description: string; icon: typeof Clock }> = [
   { value: 'weekly', label: '周报', description: '平衡复盘本周学习节奏与短板', icon: Clock },
   { value: 'exam_sprint', label: '考试冲刺', description: '聚焦提分路径与错题突破优先级', icon: Target },
   { value: 'workplace_boost', label: '职场提升', description: '强调商务表达、阅读沟通与应用场景', icon: TrendingUp },
 ];
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+type TrendMetricKey = 'frequency' | 'accuracy' | 'wrongQuestions';
+type TrendDirection = 'up' | 'down' | 'stable';
+
+interface TrendMetric {
+  key: TrendMetricKey;
+  label: string;
+  current: number;
+  previous: number;
+  unit: string;
+  trend: TrendDirection;
+  positive: boolean;
+  description: string;
+}
 
 function formatDateTime(value: string): string {
   const ts = Date.parse(value);
@@ -30,10 +55,229 @@ function formatDateTime(value: string): string {
   return new Date(ts).toLocaleString();
 }
 
+function buildTemplateProfile(report: LearningReport, templateType: ReportTemplateType): LearningReportTemplateProfile {
+  const strengthTop = report.strengths.slice(0, 3);
+  const weaknessTop = report.weaknesses.slice(0, 3);
+  const suggestionTop = report.suggestions.slice(0, 4);
+
+  if (templateType === 'exam_sprint') {
+    return {
+      templateType,
+      title: '考试冲刺结构',
+      sections: [
+        { title: '提分突破点', bullets: weaknessTop.length > 0 ? weaknessTop : ['暂无明显薄弱项'] },
+        { title: '冲刺行动清单', bullets: suggestionTop.length > 0 ? suggestionTop : ['建议维持稳定刷题节奏'] },
+        { title: '稳定得分项', bullets: strengthTop.length > 0 ? strengthTop : ['暂无明显稳定项'] },
+      ],
+    };
+  }
+
+  if (templateType === 'workplace_boost') {
+    return {
+      templateType,
+      title: '职场提升结构',
+      sections: [
+        { title: '场景应用优势', bullets: strengthTop.length > 0 ? strengthTop : ['暂无明确优势项'] },
+        { title: '沟通风险点', bullets: weaknessTop.length > 0 ? weaknessTop : ['暂无明确风险点'] },
+        { title: '应用升级建议', bullets: suggestionTop.length > 0 ? suggestionTop : ['建议保持每周稳定输入与输出'] },
+      ],
+    };
+  }
+
+  return {
+    templateType,
+    title: '周报结构',
+    sections: [
+      { title: '本周亮点', bullets: strengthTop.length > 0 ? strengthTop : ['暂无明显亮点'] },
+      { title: '待优化点', bullets: weaknessTop.length > 0 ? weaknessTop : ['暂无明显短板'] },
+      { title: '下周行动项', bullets: suggestionTop.length > 0 ? suggestionTop : ['建议继续保持学习频率'] },
+    ],
+  };
+}
+
+function parseTimestamp(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
+function resolveTrend(current: number, previous: number, higherIsBetter: boolean): Pick<TrendMetric, 'trend' | 'positive' | 'description'> {
+  if (current === previous) {
+    return {
+      trend: 'stable',
+      positive: true,
+      description: '与上一周期持平',
+    };
+  }
+
+  const increased = current > previous;
+  const trend: TrendDirection = increased ? 'up' : 'down';
+  const positive = higherIsBetter ? increased : !increased;
+  const diff = Math.abs(current - previous);
+
+  return {
+    trend,
+    positive,
+    description: `较上一周期${increased ? '增加' : '减少'} ${diff}`,
+  };
+}
+
+function formatMetricValue(metric: TrendMetric): string {
+  if (metric.unit === '%') {
+    const fixed = Number.isInteger(metric.current) ? metric.current.toFixed(0) : metric.current.toFixed(1);
+    return `${fixed}%`;
+  }
+  return `${metric.current}${metric.unit}`;
+}
+
+function buildTrendMetrics(args: {
+  readingHistory: ReadingContent[];
+  testHistory: TestResult[];
+  flashcardSessionSummary: FlashcardSessionSummary | null;
+  wrongQuestionBook: WrongQuestionRecord[];
+}): TrendMetric[] {
+  const { readingHistory, testHistory, flashcardSessionSummary, wrongQuestionBook } = args;
+  const now = Date.now();
+  const currentStart = now - SEVEN_DAYS_MS;
+  const previousStart = now - (SEVEN_DAYS_MS * 2);
+
+  const learningEventTimes: number[] = [
+    ...readingHistory
+      .map(item => parseTimestamp(item.timestamp))
+      .filter((value): value is number => value !== null),
+    ...testHistory
+      .map(item => parseTimestamp(item.date))
+      .filter((value): value is number => value !== null),
+  ];
+
+  const flashcardTime = parseTimestamp(flashcardSessionSummary?.updatedAt);
+  if (flashcardTime !== null) {
+    learningEventTimes.push(flashcardTime);
+  }
+
+  const currentFrequency = learningEventTimes.filter(ts => ts >= currentStart).length;
+  const previousFrequency = learningEventTimes.filter(ts => ts >= previousStart && ts < currentStart).length;
+  const frequencyTrend = resolveTrend(currentFrequency, previousFrequency, true);
+  const frequencyMetric: TrendMetric = {
+    key: 'frequency',
+    label: '学习频次',
+    current: currentFrequency,
+    previous: previousFrequency,
+    unit: '次',
+    ...frequencyTrend,
+  };
+
+  const testsWithDate = testHistory
+    .map(item => ({ score: item.score, ts: parseTimestamp(item.date) }))
+    .filter((item): item is { score: number; ts: number } => item.ts !== null);
+
+  const currentScores = testsWithDate.filter(item => item.ts >= currentStart).map(item => item.score);
+  const previousScores = testsWithDate.filter(item => item.ts >= previousStart && item.ts < currentStart).map(item => item.score);
+  const currentAccuracy = average(currentScores);
+  const previousAccuracy = average(previousScores);
+  const accuracyTrend = resolveTrend(currentAccuracy, previousAccuracy, true);
+  const accuracyMetric: TrendMetric = {
+    key: 'accuracy',
+    label: '测试正确率',
+    current: currentAccuracy,
+    previous: previousAccuracy,
+    unit: '%',
+    ...accuracyTrend,
+  };
+
+  const currentWrongAdded = wrongQuestionBook.filter(item => {
+    const ts = parseTimestamp(item.firstWrongAt);
+    return ts !== null && ts >= currentStart;
+  }).length;
+  const previousWrongAdded = wrongQuestionBook.filter(item => {
+    const ts = parseTimestamp(item.firstWrongAt);
+    return ts !== null && ts >= previousStart && ts < currentStart;
+  }).length;
+  const wrongTrend = resolveTrend(currentWrongAdded, previousWrongAdded, false);
+  const wrongMetric: TrendMetric = {
+    key: 'wrongQuestions',
+    label: '新增错题',
+    current: currentWrongAdded,
+    previous: previousWrongAdded,
+    unit: '题',
+    ...wrongTrend,
+  };
+
+  return [frequencyMetric, accuracyMetric, wrongMetric];
+}
+
+function buildPersonalizedSuggestions(args: {
+  trendMetrics: TrendMetric[];
+  report: LearningReport | null;
+  selectedType: ReportTemplateType;
+  wrongQuestionBook: WrongQuestionRecord[];
+  flashcardSessionSummary: FlashcardSessionSummary | null;
+}): string[] {
+  const { trendMetrics, report, selectedType, wrongQuestionBook, flashcardSessionSummary } = args;
+  const tips: string[] = [];
+  const frequencyMetric = trendMetrics.find(item => item.key === 'frequency');
+  const accuracyMetric = trendMetrics.find(item => item.key === 'accuracy');
+  const wrongMetric = trendMetrics.find(item => item.key === 'wrongQuestions');
+
+  if (frequencyMetric && frequencyMetric.current < 3) {
+    tips.push('近 7 天学习频次偏低，建议固定每周至少 3 次学习时段（每次 20-30 分钟）。');
+  } else if (frequencyMetric && frequencyMetric.trend === 'down') {
+    tips.push('学习频次较上一周期下降，建议在日历中预留固定学习时间，避免节奏回落。');
+  }
+
+  if (accuracyMetric && accuracyMetric.current > 0 && accuracyMetric.current < 75) {
+    tips.push('近 7 天测试正确率低于 75%，建议优先复盘最近两次测验中的错题解释。');
+  } else if (accuracyMetric && accuracyMetric.trend === 'down') {
+    tips.push('测试正确率出现下降，建议本周先做中等难度题并控制题量，稳定后再提难度。');
+  }
+
+  if (wrongMetric && wrongMetric.current > 0) {
+    tips.push('本周期有新增错题，建议每天完成 10 分钟错题重练并记录错因。');
+  }
+
+  if (wrongQuestionBook.length >= 8) {
+    tips.push(`当前错题本累计 ${wrongQuestionBook.length} 题，建议按阅读/词汇分组，每组先清理高重复错题。`);
+  }
+
+  if (flashcardSessionSummary && flashcardSessionSummary.dueCount >= 20) {
+    tips.push(`待复习词条 ${flashcardSessionSummary.dueCount} 个，建议先完成复习队列再新增提词，避免遗忘堆积。`);
+  }
+
+  if (report?.weaknesses?.length) {
+    tips.push(`优先修复薄弱项：${report.weaknesses[0]}，并在下一轮报告中观察该项是否改善。`);
+  }
+
+  if (selectedType === 'exam_sprint') {
+    tips.push('考试冲刺模式下，建议本周采用“错题重练 + 定时测验”组合，每日完成至少一轮。');
+  }
+
+  if (selectedType === 'workplace_boost') {
+    tips.push('职场提升模式下，建议每周至少完成 2 篇职场主题阅读并输出 3 句英文复述。');
+  }
+
+  if (tips.length === 0) {
+    tips.push('当前数据表现稳定，建议保持节奏并在下周聚焦一个能力点做专项突破。');
+  }
+
+  return Array.from(new Set(tips)).slice(0, 5);
+}
+
 export function AchievementsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [selectedType, setSelectedType] = useState('weekly');
+  const [selectedType, setSelectedType] = useState<ReportTemplateType>('weekly');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [report, setReport] = useState<LearningReport | null>(null);
@@ -47,6 +291,10 @@ export function AchievementsPage() {
 
   const readingWrongCount = wrongQuestionBook.filter(item => item.type === 'reading').length;
   const vocabularyWrongCount = wrongQuestionBook.filter(item => item.type === 'vocabulary').length;
+  const trendMetrics = useMemo(
+    () => buildTrendMetrics({ readingHistory, testHistory, flashcardSessionSummary, wrongQuestionBook }),
+    [readingHistory, testHistory, flashcardSessionSummary, wrongQuestionBook],
+  );
 
   const hasData = flashcards.length > 0
     || readingHistory.length > 0
@@ -63,9 +311,14 @@ export function AchievementsPage() {
     try {
       const learningData = { flashcards, flashcardSessionSummary, readingHistory, testHistory };
       const result = await api.report.generate(selectedType, learningData) as LearningReport;
-      setReport(result);
+      const normalized: LearningReport = {
+        ...result,
+        templateType: selectedType,
+        templateProfile: result.templateProfile || buildTemplateProfile(result, selectedType),
+      };
+      setReport(normalized);
       setErrorMessage('');
-      setReportHistory(prev => [{ ...result, timestamp: Date.now() }, ...prev].slice(0, 10));
+      setReportHistory(prev => [{ ...normalized, timestamp: Date.now() }, ...prev].slice(0, 10));
       toast('学习报告生成成功', 'success');
     } catch (err) {
       const message = (err as Error).message;
@@ -98,10 +351,27 @@ export function AchievementsPage() {
   ];
 
   const statColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+  const personalizedSuggestions = useMemo(
+    () => buildPersonalizedSuggestions({
+      trendMetrics,
+      report,
+      selectedType,
+      wrongQuestionBook,
+      flashcardSessionSummary,
+    }),
+    [trendMetrics, report, selectedType, wrongQuestionBook, flashcardSessionSummary],
+  );
+
   const loadHistoryReport = (saved: LearningReport & { timestamp?: number }) => {
     const { timestamp, ...reportData } = saved;
     void timestamp;
-    setReport(reportData);
+    const templateType = reportData.templateType || selectedType;
+    setReport({
+      ...reportData,
+      templateType,
+      templateProfile: reportData.templateProfile || buildTemplateProfile(reportData, templateType),
+    });
+    setSelectedType(templateType);
     toast('已加载历史报告', 'info');
   };
 
@@ -196,6 +466,50 @@ export function AchievementsPage() {
               <p className="leading-relaxed">{report.summary}</p>
             </Card>
 
+            {report.templateProfile && (
+              <Card>
+                <div className="analysis-card-header">
+                  <Target className="h-5 w-5 text-primary-500" />
+                  <h3 className="font-bold">{report.templateProfile.title}</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {report.templateProfile.sections.map(section => (
+                    <div key={section.title} className="analysis-item text-sm" style={{ '--item-color': '#6366f1' } as React.CSSProperties}>
+                      <p className="font-semibold mb-1">{section.title}</p>
+                      <ul className="space-y-1 text-muted-foreground">
+                        {section.bullets.map((bullet, index) => (
+                          <li key={`${section.title}-${index}`}>• {bullet}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            <Card>
+              <div className="analysis-card-header">
+                <TrendingUp className="h-5 w-5 text-primary-500" />
+                <h3 className="font-bold">趋势统计（近 7 天 vs 前 7 天）</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {trendMetrics.map(metric => (
+                  <div
+                    key={metric.key}
+                    className="analysis-item text-sm"
+                    style={{ '--item-color': metric.positive ? '#16a34a' : '#f59e0b' } as React.CSSProperties}
+                  >
+                    <p className="font-semibold mb-1">{metric.label}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatMetricValue(metric)}</p>
+                    <p className={cn('text-xs font-medium mt-1', metric.positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
+                      {metric.trend === 'up' ? '上升' : metric.trend === 'down' ? '下降' : '稳定'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{metric.description}{metric.unit}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="!pl-0 overflow-hidden">
                 <div className="analysis-item h-full !rounded-none" style={{ '--item-color': '#0ea5e9' } as React.CSSProperties}>
@@ -278,6 +592,20 @@ export function AchievementsPage() {
                 {report.suggestions.map((s, i) => (
                   <li key={i} className="analysis-item text-sm animate-slide-in" style={{ '--item-color': '#6366f1', animationDelay: `${i * 80}ms` } as React.CSSProperties}>
                     {s}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            <Card>
+              <div className="analysis-card-header">
+                <Lightbulb className="h-5 w-5 text-violet-500" />
+                <h3 className="font-bold">个性化行动建议（数据驱动）</h3>
+              </div>
+              <ul className="space-y-2">
+                {personalizedSuggestions.map((tip, index) => (
+                  <li key={`${tip.slice(0, 16)}-${index}`} className="analysis-item text-sm" style={{ '--item-color': '#8b5cf6' } as React.CSSProperties}>
+                    {tip}
                   </li>
                 ))}
               </ul>

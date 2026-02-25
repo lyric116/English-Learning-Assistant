@@ -178,6 +178,19 @@ export interface AIProviderPreset {
 }
 
 // Learning report
+export type ReportTemplateType = 'weekly' | 'exam_sprint' | 'workplace_boost' | 'monthly' | 'term';
+
+export interface LearningReportTemplateSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface LearningReportTemplateProfile {
+  templateType: ReportTemplateType;
+  title: string;
+  sections: LearningReportTemplateSection[];
+}
+
 export interface LearningReport {
   title: string;
   period: string;
@@ -189,5 +202,7 @@ export interface LearningReport {
   strengths: string[];
   weaknesses: string[];
   suggestions: string[];
+  templateType?: ReportTemplateType;
+  templateProfile?: LearningReportTemplateProfile;
   timestamp?: number;
 }

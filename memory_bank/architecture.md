@@ -1,5 +1,32 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Trend Metrics & Personalized Suggestions (`P2-A-02`)
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: achievements analytics and recommendation runtime.
+- Changes:
+  - added deterministic 7-day trend computation (`current 7 days` vs `previous 7 days`) for:
+    - 学习频次
+    - 测试正确率
+    - 新增错题
+  - introduced trend direction resolver (`上升/下降/稳定`) with metric deltas and positive/negative semantic interpretation
+  - added data-driven recommendation generator combining:
+    - trend metrics
+    - wrong-question-book scale
+    - flashcard due count
+    - report weak points
+    - active template context (`weekly/exam_sprint/workplace_boost`)
+  - report-history reload now restores template type and backfills missing template profile blocks to keep template switch behavior stable for legacy records
+
+### `client/src/types/index.ts`
+- Role: report template contract typing.
+- Changes:
+  - added report template typing (`ReportTemplateType`) and template profile structures (`LearningReportTemplateProfile` + section model)
+  - extended `LearningReport` with optional `templateType/templateProfile` for compatible historical replay
+
+### Architectural Impact
+- Achievements report output now combines AI narrative with deterministic local analytics, reducing pure prompt variance and making trend/suggestion results verifiable against local learning history.
+
 ## Update 2026-02-25: Report Template Expansion (`P2-A-01`)
 
 ### `client/src/pages/AchievementsPage.tsx`

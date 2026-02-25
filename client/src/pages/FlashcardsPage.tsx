@@ -102,6 +102,7 @@ export function FlashcardsPage() {
   const [flipped, setFlipped] = useState(false);
   const [sessionState, setSessionState] = useState<SessionState>(() => createSessionState(0));
   const [, setSessionSummary] = useLocalStorage<FlashcardSessionSummary | null>('flashcardSessionSummary', null);
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   const { speak } = useTts();
   const { toast } = useToast();
 
@@ -150,6 +151,36 @@ export function FlashcardsPage() {
     const now = Date.now();
     setWords(words.map(word => normalizeWord(word as RawWord, now)));
   }, [words, setWords]);
+
+  useEffect(() => {
+    if (historyHydrated || words.length > 0) return;
+
+    let cancelled = false;
+    const hydrateHistory = async () => {
+      try {
+        const remote = await api.flashcards.history(120) as RawWord[];
+        if (!Array.isArray(remote) || remote.length === 0 || cancelled) {
+          return;
+        }
+
+        const now = Date.now();
+        const normalized = remote.map(item => normalizeWord(item, now));
+        setWords(prev => (prev.length > 0 ? prev : normalized));
+        toast(`已从后端恢复 ${normalized.length} 条闪卡历史`, 'info');
+      } catch {
+        // Keep local-first behavior when backend history is unavailable.
+      } finally {
+        if (!cancelled) {
+          setHistoryHydrated(true);
+        }
+      }
+    };
+
+    void hydrateHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyHydrated, setWords, toast, words.length]);
 
   const queue = useMemo(() => {
     const nowTs = Date.now();

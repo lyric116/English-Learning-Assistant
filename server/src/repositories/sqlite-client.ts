@@ -62,6 +62,24 @@ export class SqliteClient {
     return (result.stdout || '').trim();
   }
 
+  queryJson<T>(query: string): T[] {
+    const result = spawnSync(this.sqliteBinary, ['-json', this.dbPath, query], { encoding: 'utf8' });
+
+    if (result.status !== 0) {
+      const detail = (result.stderr || result.stdout || '').trim();
+      throw new Error(detail || 'sqlite3 查询失败');
+    }
+
+    const text = (result.stdout || '').trim();
+    if (!text) return [];
+
+    try {
+      return JSON.parse(text) as T[];
+    } catch {
+      throw new Error('sqlite3 查询结果 JSON 解析失败');
+    }
+  }
+
   getDatabasePath(): string {
     return this.dbPath;
   }

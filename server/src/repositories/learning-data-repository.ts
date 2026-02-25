@@ -9,6 +9,10 @@ interface FlashcardRecord {
   etymology: string;
   example: string;
   exampleTranslation: string;
+  learningStatus?: 'new' | 'reviewing' | 'mastered';
+  nextReviewAt?: number;
+  accuracy?: number;
+  reviewCount?: number;
 }
 
 interface ReadingPersistPayload {
@@ -31,6 +35,12 @@ interface QuizGenerationPayload {
 }
 
 type LearningReportPayload = Record<string, unknown>;
+
+interface SentenceHistoryRecord {
+  sentence: string;
+  result: unknown;
+  timestamp: number;
+}
 
 function normalizeOwnerId(rawOwnerId: string | undefined): string {
   const trimmed = (rawOwnerId || '').trim();
@@ -98,13 +108,92 @@ class LearningDataRepository {
     }
   }
 
+  private query<T>(module: string, action: string, statement: string): T[] {
+    if (!this.enabled || !this.available) return [];
+
+    try {
+      const result = this.sqlite.queryJson<T>(statement);
+      logger.info('repository.read.ok', { module, action, rows: result.length });
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('repository.read.failed', { module, action, error: message });
+      return [];
+    }
+  }
+
+  getFlashcards(ownerIdRaw: string | undefined, limit = 120): FlashcardRecord[] {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 500)) : 120;
+    const query = `
+      SELECT
+        word,
+        phonetic,
+        definition,
+        etymology,
+        example,
+        example_translation AS exampleTranslation,
+        learning_status AS learningStatus,
+        CAST(COALESCE(strftime('%s', next_review_at), strftime('%s', 'now')) AS INTEGER) * 1000 AS nextReviewAt,
+        CAST(COALESCE(accuracy, 0) AS REAL) AS accuracy,
+        CAST(COALESCE(review_count, 0) AS INTEGER) AS reviewCount
+      FROM flashcards
+      WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+        AND owner_id = ${SqliteClient.sqlLiteral(ownerId)}
+      ORDER BY updated_at DESC
+      LIMIT ${safeLimit};
+    `;
+    return this.query<FlashcardRecord>('flashcards', 'select_history', query);
+  }
+
+  getSentenceHistory(ownerIdRaw: string | undefined, limit = 20): SentenceHistoryRecord[] {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
+    const query = `
+      SELECT
+        sentence_text AS sentence,
+        analysis_json AS analysisJson,
+        CAST(COALESCE(strftime('%s', created_at), strftime('%s', 'now')) AS INTEGER) * 1000 AS timestamp
+      FROM sentence_analyses
+      WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+        AND owner_id = ${SqliteClient.sqlLiteral(ownerId)}
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit};
+    `;
+
+    const rows = this.query<{ sentence: string; analysisJson: string; timestamp: number }>('sentence', 'select_history', query);
+    return rows.map(item => {
+      let parsed: unknown = {};
+      try {
+        parsed = item.analysisJson ? JSON.parse(item.analysisJson) : {};
+      } catch {
+        parsed = {};
+      }
+      return {
+        sentence: item.sentence,
+        result: parsed,
+        timestamp: item.timestamp,
+      };
+    });
+  }
+
   persistFlashcards(ownerIdRaw: string | undefined, words: FlashcardRecord[]): void {
     if (!Array.isArray(words) || words.length === 0) return;
 
     const ownerId = normalizeOwnerId(ownerIdRaw);
     const ownerType = 'anonymous';
 
-    const statements = words.map(item => `
+    const statements = words.map(item => {
+      const learningStatus = item.learningStatus || 'new';
+      const accuracy = typeof item.accuracy === 'number' ? Math.max(0, item.accuracy) : 0;
+      const reviewCount = typeof item.reviewCount === 'number' ? Math.max(0, item.reviewCount) : 0;
+      const nextReviewAt = typeof item.nextReviewAt === 'number'
+        ? new Date(item.nextReviewAt).toISOString()
+        : null;
+
+      return `
       INSERT INTO flashcards (
         id, owner_type, owner_id, word, phonetic, definition, etymology, example, example_translation,
         learning_status, accuracy, review_count, next_review_at, source_text_hash, created_at, updated_at
@@ -118,10 +207,10 @@ class LearningDataRepository {
         ${SqliteClient.sqlLiteral(item.etymology)},
         ${SqliteClient.sqlLiteral(item.example)},
         ${SqliteClient.sqlLiteral(item.exampleTranslation)},
-        'new',
-        0,
-        0,
-        NULL,
+        ${SqliteClient.sqlLiteral(learningStatus)},
+        ${SqliteClient.sqlLiteral(accuracy)},
+        ${SqliteClient.sqlLiteral(reviewCount)},
+        ${SqliteClient.sqlLiteral(nextReviewAt)},
         NULL,
         datetime('now'),
         datetime('now')
@@ -132,8 +221,13 @@ class LearningDataRepository {
         etymology = excluded.etymology,
         example = excluded.example,
         example_translation = excluded.example_translation,
+        learning_status = excluded.learning_status,
+        accuracy = excluded.accuracy,
+        review_count = excluded.review_count,
+        next_review_at = excluded.next_review_at,
         updated_at = datetime('now');
-    `);
+    `;
+    });
 
     this.execute('flashcards', 'upsert_words', statements.join('\n'));
   }

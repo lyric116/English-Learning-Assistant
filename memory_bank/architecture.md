@@ -1,5 +1,38 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: First-Batch Persistence Migration (`P3-06`)
+
+### `server/src/repositories/learning-data-repository.ts`
+- Added read-side methods for first migration batch:
+  - `getFlashcards(ownerId, limit)`
+  - `getSentenceHistory(ownerId, limit)`
+- Existing write-side methods now support carrying flashcard learning fields (`learningStatus/nextReviewAt/accuracy/reviewCount`) when provided.
+
+### `server/src/repositories/sqlite-client.ts`
+- Added `queryJson<T>()` for JSON-mode SQLite reads, enabling lightweight repository query mapping without new ORM dependency.
+
+### `server/src/routes/flashcards.ts`
+- Added `GET /history` route mapped to repository read method with `limit` parsing.
+
+### `server/src/routes/sentence.ts`
+- Added `GET /history` route mapped to repository read method with `limit` parsing.
+
+### `client/src/lib/api.ts`
+- Added API client methods:
+  - `api.flashcards.history(limit?)`
+  - `api.sentence.history(limit?)`
+
+### `client/src/pages/FlashcardsPage.tsx`
+- Added empty-local hydration effect:
+  - when local `flashcards` is empty, pull backend history and normalize to current word model.
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Added empty-local hydration effect:
+  - when local `sentenceHistory` is empty, pull backend history and normalize analysis payload to current schema.
+
+### Architectural Impact
+- Flashcards and sentence modules now have initial local-to-backend recovery path, enabling data availability after local-storage reset in migration phase one.
+
 ## Update 2026-02-25: Repository Layer Abstraction (`P3-05`)
 
 ### `server/src/repositories/sqlite-client.ts`

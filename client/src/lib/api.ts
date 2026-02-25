@@ -105,6 +105,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ text, maxWords, level }),
       }),
+    history: (limit = 120) =>
+      request(`/flashcards/history?limit=${encodeURIComponent(String(limit))}`),
   },
   sentence: {
     analyze: (sentence: string) =>
@@ -112,6 +114,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ sentence }),
       }),
+    history: (limit = 20) =>
+      request(`/sentence/history?limit=${encodeURIComponent(String(limit))}`),
   },
   reading: {
     generate: (text: string, languageOrOptions?: ReadingLanguage | ReadingGenerateOptions) => {

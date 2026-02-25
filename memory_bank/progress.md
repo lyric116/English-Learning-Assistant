@@ -1,5 +1,34 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-06-first-batch-persistence-migration)
+
+### Completed
+- Completed `P3-06` (第一批持久化迁移：闪卡 + 句子分析历史).
+- Backend additions:
+  - `GET /api/v1/flashcards/history`
+  - `GET /api/v1/sentence/history`
+  - repository read methods:
+    - `getFlashcards`
+    - `getSentenceHistory`
+- Frontend migration behavior:
+  - Flashcards page: local `flashcards` 为空时自动回源 `/flashcards/history` 并恢复
+  - Sentence page: local `sentenceHistory` 为空时自动回源 `/sentence/history` 并恢复
+  - both pages keep local-first behavior and silent fallback if backend unavailable
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `SQLITE_DB_PATH=/tmp/english-learning-p306-test.db npm run db:migrate` ✅
+- 仓储直连校验：
+  - 写入 `persistFlashcards` / `persistSentenceAnalysis` 后
+  - 读取 `getFlashcards` / `getSentenceHistory` 返回有效数据（`context`, `Learning never stops.`）✅
+- 备注：当前沙箱禁止本地端口监听（`listen EPERM`），因此无法在本环境用 `curl` 跑 HTTP 端到端，仅完成等效仓储层读写验证。
+
+### Notes For Next Developer
+- `P3-06` is complete; flashcards and sentence history now support backend recovery path when local storage is empty.
+- Next step is `P3-07` (阅读/测验/报告迁移到后端并支持页面回显).
+
 ## 2026-02-25 (complete/p3-05-repository-layer)
 
 ### Completed

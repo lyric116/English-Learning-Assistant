@@ -220,6 +220,7 @@ export function SentenceAnalysisPage() {
   const [activeGrammarIndex, setActiveGrammarIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   const [noteHistory, setNoteHistory] = useLocalStorage<SentenceNoteRecord[]>('sentenceNotesHistory', []);
   const { toast } = useToast();
 
@@ -280,6 +281,42 @@ export function SentenceAnalysisPage() {
       result: normalizeSentenceAnalysis(item.result),
     })));
   }, [history, setHistory]);
+
+  useEffect(() => {
+    if (historyHydrated || history.length > 0) return;
+
+    let cancelled = false;
+    const hydrateHistory = async () => {
+      try {
+        const remote = await api.sentence.history(20) as AnalysisRecord[];
+        if (!Array.isArray(remote) || remote.length === 0 || cancelled) {
+          return;
+        }
+
+        const normalized = remote
+          .filter(item => typeof item.sentence === 'string')
+          .map(item => ({
+            sentence: item.sentence,
+            result: normalizeSentenceAnalysis(item.result),
+            timestamp: typeof item.timestamp === 'number' ? item.timestamp : Date.now(),
+          }))
+          .slice(0, 20);
+        setHistory(prev => (prev.length > 0 ? prev : normalized));
+        toast(`已从后端恢复 ${normalized.length} 条句子分析历史`, 'info');
+      } catch {
+        // Keep local-first behavior when backend history is unavailable.
+      } finally {
+        if (!cancelled) {
+          setHistoryHydrated(true);
+        }
+      }
+    };
+
+    void hydrateHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [history.length, historyHydrated, setHistory, toast]);
 
   const analyze = async () => {
     if (!input.trim()) return;

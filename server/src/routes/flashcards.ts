@@ -38,6 +38,12 @@ function normalizeExtractedWords(payload: unknown, maxWords: number): ExtractedW
   return normalized.slice(0, maxWords);
 }
 
+function parseLimit(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return fallback;
+  return Math.max(1, Math.min(parsed, 500));
+}
+
 flashcardsRouter.post('/extract', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { text, maxWords, level, aiConfig } = validateFlashcardsExtractPayload(req.body);
@@ -45,6 +51,16 @@ flashcardsRouter.post('/extract', async (req: Request, res: Response, next: Next
     const normalizedResult = normalizeExtractedWords(result, maxWords);
     learningDataRepository.persistFlashcards(req.header('x-anonymous-session-id') || undefined, normalizedResult);
     res.json(normalizedResult);
+  } catch (err) {
+    next(err);
+  }
+});
+
+flashcardsRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseLimit(req.query.limit, 120);
+    const result = learningDataRepository.getFlashcards(req.header('x-anonymous-session-id') || undefined, limit);
+    res.json(result);
   } catch (err) {
     next(err);
   }

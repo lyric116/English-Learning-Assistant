@@ -54,7 +54,7 @@
 | 48 | P3-03 | completed | Added five-module DB model doc (`code/database_model_design.md`) with owner model, table schema, index strategy, and core query mapping. |
 | 49 | P3-04 | completed | Introduced SQLite migration mechanism (`server/scripts/migrate.js` + `server/migrations/001_init_schema.sql`) and verified empty-db apply + idempotent re-run. |
 | 50 | P3-05 | completed | Added repository layer (`learning-data-repository`) and wired one persistence write path for each module route with structured repository logs. |
-| 51 | P3-06 | pending | Not started. |
+| 51 | P3-06 | completed | First-batch persistence migration landed for Flashcards + Sentence history: backend history read APIs + frontend empty-local fallback hydration from server. |
 | 52 | P3-07 | pending | Not started. |
 | 53 | P3-08 | pending | Not started. |
 | 54 | P3-09 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P3-06`.
+- First not-yet-completed step: `P3-07`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

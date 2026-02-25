@@ -154,6 +154,12 @@ function normalizeSentenceAnalysis(payload: unknown): NormalizedSentenceAnalysis
   };
 }
 
+function parseLimit(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return fallback;
+  return Math.max(1, Math.min(parsed, 200));
+}
+
 sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sentence, aiConfig } = validateSentenceAnalyzePayload(req.body);
@@ -165,6 +171,16 @@ sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFu
       normalizedResult,
     );
     res.json(normalizedResult);
+  } catch (err) {
+    next(err);
+  }
+});
+
+sentenceRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseLimit(req.query.limit, 20);
+    const result = learningDataRepository.getSentenceHistory(req.header('x-anonymous-session-id') || undefined, limit);
+    res.json(result);
   } catch (err) {
     next(err);
   }

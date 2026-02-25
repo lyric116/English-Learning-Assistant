@@ -1,5 +1,26 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-a-04-achievements-regression)
+
+### Completed
+- Completed `P2-A-04` (成就模块回归测试).
+- Added regression artifact: `code/achievements_regression_checklist.md`.
+- Regression scope includes:
+  - 报告生成主流程
+  - 模板切换与结构差异
+  - 趋势统计与个性化建议
+  - 结构化分享内容
+  - 历史报告回放兼容
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-A-04` is complete; achievements phase (`P2-A-01` ~ `P2-A-04`) is now fully closed.
+- Next step is `P3-01` (会话与用户策略架构决策文档).
+
 ## 2026-02-25 (complete/p2-a-03-structured-share-upgrade)
 
 ### Completed

@@ -1,5 +1,23 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Achievements Regression Closure (`P2-A-04`)
+
+### `code/achievements_regression_checklist.md`
+- Role: achievements module regression execution record.
+- Scope captured:
+  - report generation
+  - template switching and structure variance
+  - trend metrics and personalized recommendation rendering
+  - structured share preview/copy flow
+  - history report compatibility replay
+- Gate evidence:
+  - `cd server && npm run build`
+  - `cd client && npm run lint`
+  - `cd client && npm run build`
+
+### Reliability Impact
+- Achievements phase now has a formal regression closure artifact aligned with previous module closure format, reducing risk before entering P3 architecture work.
+
 ## Update 2026-02-25: Structured Share Upgrade (`P2-A-03`)
 
 ### `client/src/pages/AchievementsPage.tsx`

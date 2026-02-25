@@ -48,7 +48,7 @@
 | 42 | P2-A-01 | completed | Added three report templates (`weekly/exam_sprint/workplace_boost`) with frontend template picker and backend template-aware prompt strategy + validator support. |
 | 43 | P2-A-02 | completed | Added achievements trend metrics (`学习频次/测试正确率/新增错题`) and data-driven personalized suggestions, with template-profile rendering + history reload compatibility. |
 | 44 | P2-A-03 | completed | Upgraded share flow to structured content with title/summary/key metrics/trends/actions preview + one-click clipboard copy. |
-| 45 | P2-A-04 | pending | Not started. |
+| 45 | P2-A-04 | completed | Achievements regression checklist executed (`code/achievements_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
 | 46 | P3-01 | pending | Not started. |
 | 47 | P3-02 | pending | Not started. |
 | 48 | P3-03 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-A-04`.
+- First not-yet-completed step: `P3-01`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

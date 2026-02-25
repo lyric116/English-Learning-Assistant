@@ -19,9 +19,9 @@ import type { FlashcardSessionSummary, LearningReport, Word, ReadingContent, Tes
 import { AIConfigBanner } from '@/components/settings/AIConfigBanner';
 
 const reportTypes = [
-  { value: 'weekly', label: '周报', icon: Clock },
-  { value: 'monthly', label: '月报', icon: BarChart3 },
-  { value: 'term', label: '学期报告', icon: TrendingUp },
+  { value: 'weekly', label: '周报', description: '平衡复盘本周学习节奏与短板', icon: Clock },
+  { value: 'exam_sprint', label: '考试冲刺', description: '聚焦提分路径与错题突破优先级', icon: Target },
+  { value: 'workplace_boost', label: '职场提升', description: '强调商务表达、阅读沟通与应用场景', icon: TrendingUp },
 ];
 
 function formatDateTime(value: string): string {
@@ -151,6 +151,7 @@ export function AchievementsPage() {
                       ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-500 text-primary-700 dark:text-primary-300 shadow-sm'
                       : 'border-border text-muted-foreground hover:border-primary-300 hover:text-primary-600 dark:hover:text-primary-400',
                   )}
+                  title={rt.description}
                 >
                   <Icon className="h-4 w-4" />
                   {rt.label}
@@ -158,6 +159,9 @@ export function AchievementsPage() {
               );
             })}
           </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            当前模板：{reportTypes.find(item => item.value === selectedType)?.description}
+          </p>
           <Button onClick={generateReport} loading={loading} disabled={loading || !hasData}>
             <BarChart3 className="h-4 w-4 mr-1.5" />
             生成学习报告

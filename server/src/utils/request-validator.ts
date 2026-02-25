@@ -51,7 +51,7 @@ interface VocabularyQuestionsPayload {
 }
 
 interface ReportGeneratePayload {
-  reportType: 'weekly' | 'monthly' | 'term';
+  reportType: 'weekly' | 'exam_sprint' | 'workplace_boost' | 'monthly' | 'term';
   learningData: Record<string, unknown>;
   aiConfig?: ValidatedAIConfig;
 }
@@ -287,7 +287,12 @@ export function validateVocabularyQuestionsPayload(body: unknown): VocabularyQue
 export function validateReportGeneratePayload(body: unknown): ReportGeneratePayload {
   const obj = ensureObject(body);
 
-  const reportType = readRequiredEnum(obj, 'reportType', '报告类型', ['weekly', 'monthly', 'term'] as const);
+  const reportType = readRequiredEnum(
+    obj,
+    'reportType',
+    '报告类型',
+    ['weekly', 'exam_sprint', 'workplace_boost', 'monthly', 'term'] as const,
+  );
 
   const learningData = ensureObject(obj.learningData, '学习数据');
   const aiConfig = readOptionalAiConfig(obj);

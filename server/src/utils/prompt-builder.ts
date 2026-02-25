@@ -269,12 +269,42 @@ ${JSON.stringify(vocabulary)}
 }
 
 export function buildLearningReportPrompt(reportType: string, learningData: unknown): string {
-  const reportTypeName = reportType === 'weekly' ? '周报' :
-                         reportType === 'monthly' ? '月报' : '学期报告';
+  const reportTemplateMap: Record<string, { name: string; focus: string; suggestionStyle: string }> = {
+    weekly: {
+      name: '周报',
+      focus: '强调近 7 天学习节奏、知识吸收速度与下周微调策略。',
+      suggestionStyle: '建议偏短周期，可执行到“本周/明天”级别。',
+    },
+    exam_sprint: {
+      name: '考试冲刺',
+      focus: '强调提分效率、错题突破顺序、薄弱题型优先级与冲刺节奏。',
+      suggestionStyle: '建议偏应试导向，给出明确训练频次和题型优先级。',
+    },
+    workplace_boost: {
+      name: '职场提升',
+      focus: '强调工作场景沟通、商务阅读、表达准确性与跨文化语境。',
+      suggestionStyle: '建议偏应用导向，突出会议、邮件、汇报等真实场景。',
+    },
+    monthly: {
+      name: '月报',
+      focus: '强调 30 天阶段趋势、能力迁移与稳态提升。',
+      suggestionStyle: '建议偏阶段性目标与里程碑。',
+    },
+    term: {
+      name: '学期报告',
+      focus: '强调长期成长曲线、优势固化与弱项系统修复。',
+      suggestionStyle: '建议偏长期规划与周期复盘。',
+    },
+  };
+  const template = reportTemplateMap[reportType] || reportTemplateMap.weekly;
+  const reportTypeName = template.name;
 
   return `请根据以下学习数据，生成一份${reportTypeName}：
 
 学习数据：${JSON.stringify(learningData)}
+
+模板重点：${template.focus}
+建议风格：${template.suggestionStyle}
 
 请分析以下内容：
 1. 学习时间统计和趋势

@@ -1,5 +1,34 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Report Template Expansion (`P2-A-01`)
+
+### `client/src/pages/AchievementsPage.tsx`
+- Role: report-template selector UI.
+- Changes:
+  - template selector now targets explicit scenario templates:
+    - `weekly`
+    - `exam_sprint`
+    - `workplace_boost`
+  - each template exposes user-facing description to clarify reporting intent
+
+### `server/src/utils/request-validator.ts`
+- Role: report-type contract gate.
+- Changes:
+  - report type validation now supports new template IDs
+  - backward compatibility retained for legacy `monthly` / `term`
+
+### `server/src/utils/prompt-builder.ts`
+- Role: report template strategy source.
+- Changes:
+  - introduced template strategy map:
+    - template display name
+    - focus directive
+    - suggestion style directive
+  - prompt now injects template strategy fields before analysis instructions
+
+### Architectural Impact
+- Report generation now supports scenario-aware prompt behaviors while preserving compatibility for historical report types.
+
 ## Update 2026-02-25: Quiz Regression Closure (`P2-Q-06`)
 
 ### `code/quiz_regression_checklist.md`

@@ -45,7 +45,7 @@
 | 39 | P2-Q-04 | completed | Implemented timed quiz runtime: countdown display, early submit, timeout auto-submit, and timeout notification; timer state resets correctly across mode switches. |
 | 40 | P2-Q-05 | completed | Unified quiz scoring/accuracy metrics via shared calculation, standardized in-question feedback (your answer + correct answer + explanation), and aligned result/history displays with consistent score semantics. |
 | 41 | P2-Q-06 | completed | Quiz regression checklist executed (`code/quiz_regression_checklist.md`) with gates passing (`server build`, `client lint/build`). |
-| 42 | P2-A-01 | pending | Not started. |
+| 42 | P2-A-01 | completed | Added three report templates (`weekly/exam_sprint/workplace_boost`) with frontend template picker and backend template-aware prompt strategy + validator support. |
 | 43 | P2-A-02 | pending | Not started. |
 | 44 | P2-A-03 | pending | Not started. |
 | 45 | P2-A-04 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-A-01`.
+- First not-yet-completed step: `P2-A-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

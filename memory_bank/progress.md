@@ -1,5 +1,29 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-a-01-report-template-expansion)
+
+### Completed
+- Completed `P2-A-01` (成就报告模板扩展).
+- Frontend template layer:
+  - Achievements page now offers three explicit templates:
+    - `weekly`（周报）
+    - `exam_sprint`（考试冲刺）
+    - `workplace_boost`（职场提升）
+  - template description is visible in UI and tied to current selection
+- Backend template contract sync:
+  - report validator now supports new template IDs
+  - report prompt builder now applies template-specific focus and suggestion style
+  - kept `monthly/term` compatibility in backend validator/prompt mapping to avoid historical breakage
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-A-01` is complete; report generation now has explicit scenario templates with differentiated prompt strategy.
+- Next step is `P2-A-02` (报告模板切换效果验证与结构差异增强).
+
 ## 2026-02-25 (complete/p2-q-06-quiz-regression)
 
 ### Completed

@@ -1,5 +1,32 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Migration Mechanism (`P3-04`)
+
+### `server/scripts/migrate.js`
+- Role: schema migration runner.
+- Changes:
+  - executes ordered SQL migrations from `server/migrations/`
+  - initializes and maintains `schema_migrations` metadata table
+  - enforces checksum consistency for applied files
+  - supports idempotent re-run (applied files are skipped)
+  - supports environment-driven DB target via `SQLITE_DB_PATH`
+
+### `server/migrations/001_init_schema.sql`
+- Role: first baseline schema migration.
+- Contents:
+  - users/sessions tables
+  - five-module persistence tables
+  - cross-module ownership fields (`owner_type`, `owner_id`)
+  - query-oriented index baseline
+
+### `server/package.json`
+- Added migration commands:
+  - `db:migrate`
+  - `db:migrate:test`
+
+### Architectural Impact
+- Backend now has executable, repeatable schema evolution infrastructure, enabling controlled rollout for upcoming repository-layer and persistence migration steps.
+
 ## Update 2026-02-25: Database Model Design (`P3-03`)
 
 ### `code/database_model_design.md`

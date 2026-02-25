@@ -1,5 +1,30 @@
 # Progress Log
 
+## 2026-02-25 (complete/p3-04-migration-mechanism)
+
+### Completed
+- Completed `P3-04` (迁移机制落地).
+- Added migration runtime:
+  - `server/scripts/migrate.js`
+  - migration version table: `schema_migrations`
+  - checksum verification + idempotent skip behavior
+- Added initial schema migration:
+  - `server/migrations/001_init_schema.sql`
+  - covers users/sessions + five-module core tables + index baseline
+- Added command entries in `server/package.json`:
+  - `npm run db:migrate`
+  - `npm run db:migrate:test`
+
+### Validation Performed
+- `rm -f /tmp/english-learning-migration-test.db && cd server && SQLITE_DB_PATH=/tmp/english-learning-migration-test.db npm run db:migrate` ✅（空库首次迁移）
+- `cd server && SQLITE_DB_PATH=/tmp/english-learning-migration-test.db npm run db:migrate` ✅（重复执行无破坏，自动 skip）
+- `/home/lyricx/miniconda3/bin/sqlite3 /tmp/english-learning-migration-test.db \"SELECT name FROM schema_migrations;\"` ✅（记录存在）
+- `cd server && npm run build` ✅
+
+### Notes For Next Developer
+- `P3-04` is complete; migration workflow is now executable and idempotent for SQLite baseline.
+- Next step is `P3-05` (后端仓储层抽象，引入统一数据访问入口).
+
 ## 2026-02-25 (complete/p3-03-database-model-design)
 
 ### Completed

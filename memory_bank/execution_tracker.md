@@ -52,7 +52,7 @@
 | 46 | P3-01 | completed | Added session/user strategy ADR (`code/session_user_strategy_decision.md`) covering lifecycle, permission boundaries, and anonymous->login migration strategy. |
 | 47 | P3-02 | completed | Added token-flow design doc (`code/session_token_flow_design.md`) covering create/refresh/expire/recover and client-server transmission contract. |
 | 48 | P3-03 | completed | Added five-module DB model doc (`code/database_model_design.md`) with owner model, table schema, index strategy, and core query mapping. |
-| 49 | P3-04 | pending | Not started. |
+| 49 | P3-04 | completed | Introduced SQLite migration mechanism (`server/scripts/migrate.js` + `server/migrations/001_init_schema.sql`) and verified empty-db apply + idempotent re-run. |
 | 50 | P3-05 | pending | Not started. |
 | 51 | P3-06 | pending | Not started. |
 | 52 | P3-07 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P3-04`.
+- First not-yet-completed step: `P3-05`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

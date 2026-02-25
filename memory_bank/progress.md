@@ -1,5 +1,28 @@
 # Progress Log
 
+## 2026-02-25 (complete/p1-08-homepage-ia-refresh)
+
+### Completed
+- Completed `P1-08` (homepage visual + information structure enhancement).
+- Rebuilt `HomePage` to improve first-screen clarity and CTA hierarchy:
+  - clearer product positioning headline/subtitle
+  - dual CTA strategy (`从闪卡开始` primary + `先做双语阅读` secondary)
+  - quick signal cards to communicate onboarding speed and learning loop
+- Strengthened module discoverability:
+  - explicit five-module entry map with per-module value proposition and direct action link
+- Added guided learning structure:
+  - recommended learning path block (`输入文本 -> 生成材料 -> 学习测试 -> 复盘沉淀`)
+  - two "start here" cards for novice path vs pre-existing material path
+- Layout verified with existing responsive shell to avoid mobile first-screen collapse misalignment.
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P1-08` is complete; homepage now acts as a stronger conversion + navigation entry point.
+- Next step is `P1-09` (unify five module page framework).
+
 ## 2026-02-25 (complete/p1-07-navigation-shell-refactor)
 
 ### Completed

@@ -1,5 +1,18 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Homepage IA Refresh (`P1-08`)
+
+### `client/src/pages/HomePage.tsx`
+- Role: top-level product entry and conversion/navigation gateway.
+- Changes:
+  - rebuilt hero section with explicit product positioning and two-level CTA hierarchy
+  - added quick-signal cards to communicate onboarding speed and loop closure
+  - added explicit five-module entry map with direct navigation actions
+  - added guided learning path section and scenario-based starting recommendations
+- Architectural impact:
+  - homepage now carries clear "what this product is" + "what to click next" responsibilities
+  - reduces entry ambiguity for first-time mobile and desktop users
+
 ## Update 2026-02-25: Navigation & Shell Refactor (`P1-07`)
 
 ### `client/src/components/layout/Navbar.tsx`

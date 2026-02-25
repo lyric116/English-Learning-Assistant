@@ -86,6 +86,12 @@ function normalizeToken(value: string): string {
   return value.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '').toLowerCase();
 }
 
+function normalizeLookupText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s,.;:!?()[\]{}"'`，。；：！？（）【】]/g, '');
+}
+
 function isSentenceAnalysisV2(value: unknown): value is SentenceAnalysis {
   if (!isRecord(value)) return false;
   const words = value.words;
@@ -167,6 +173,7 @@ export function SentenceAnalysisPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const [activeWordKey, setActiveWordKey] = useState<string | null>(null);
+  const [activeGrammarIndex, setActiveGrammarIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useLocalStorage<AnalysisRecord[]>('sentenceHistory', []);
   const { toast } = useToast();
@@ -188,6 +195,37 @@ export function SentenceAnalysisPage() {
     [input],
   );
   const activeWordInfo = activeWordKey ? wordLookup.get(activeWordKey) ?? null : null;
+  const activeGrammar = useMemo(() => {
+    if (!result || activeGrammarIndex === null) return null;
+    return result.grammarPoints[activeGrammarIndex] ?? null;
+  }, [activeGrammarIndex, result]);
+  const linkedPhraseIndexes = useMemo(() => {
+    const linked = new Set<number>();
+    if (!result || activeGrammarIndex === null) return linked;
+    const grammarPoint = result.grammarPoints[activeGrammarIndex];
+    if (!grammarPoint) return linked;
+
+    const terms = [grammarPoint.title, ...grammarPoint.tags]
+      .map(normalizeLookupText)
+      .filter(term => term.length > 1);
+
+    result.phrases.forEach((phrase, index) => {
+      const phraseText = [
+        phrase.text,
+        phrase.category,
+        phrase.function,
+        phrase.explanation,
+      ].map(normalizeLookupText).join(' ');
+      if (terms.some(term => phraseText.includes(term))) {
+        linked.add(index);
+      }
+    });
+
+    if (linked.size === 0 && result.phrases[activeGrammarIndex]) {
+      linked.add(activeGrammarIndex);
+    }
+    return linked;
+  }, [activeGrammarIndex, result]);
 
   useEffect(() => {
     const hasLegacy = history.some(item => !isSentenceAnalysisV2(item.result));
@@ -205,6 +243,7 @@ export function SentenceAnalysisPage() {
     setResult(null);
     setActiveTooltip(null);
     setActiveWordKey(null);
+    setActiveGrammarIndex(null);
     try {
       const data = await api.sentence.analyze(input);
       const normalized = normalizeSentenceAnalysis(data);
@@ -237,6 +276,7 @@ export function SentenceAnalysisPage() {
     setResult(normalizeSentenceAnalysis(record.result));
     setActiveTooltip(null);
     setActiveWordKey(null);
+    setActiveGrammarIndex(null);
   };
 
   const clearCurrent = () => {
@@ -244,6 +284,7 @@ export function SentenceAnalysisPage() {
     setResult(null);
     setActiveTooltip(null);
     setActiveWordKey(null);
+    setActiveGrammarIndex(null);
     setErrorMessage('');
   };
 
@@ -555,12 +596,24 @@ export function SentenceAnalysisPage() {
               {result.phrases && result.phrases.length > 0 ? (
                 <ul className="space-y-3">
                   {result.phrases.map((p, i) => (
-                    <li key={i} className="analysis-item text-sm" style={{ '--item-color': '#10b981' } as React.CSSProperties}>
+                    <li
+                      key={i}
+                      className={cn(
+                        'analysis-item text-sm transition-colors',
+                        linkedPhraseIndexes.has(i) && 'ring-1 ring-indigo-300/60 bg-indigo-50/45 dark:bg-indigo-900/30',
+                      )}
+                      style={{ '--item-color': linkedPhraseIndexes.has(i) ? '#6366f1' : '#10b981' } as React.CSSProperties}
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
                           {p.category || '短语'}
                         </span>
                         {p.function && <span className="text-xs text-muted-foreground">作用: {p.function}</span>}
+                        {linkedPhraseIndexes.has(i) && (
+                          <span className="text-xs font-medium rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5">
+                            已关联
+                          </span>
+                        )}
                       </div>
                       <p className="italic text-foreground/80 font-serif">"{p.text}"</p>
                       <p className="mt-1 text-muted-foreground">{p.explanation}</p>
@@ -578,23 +631,53 @@ export function SentenceAnalysisPage() {
                 <h2 className="text-lg font-bold">语法要点</h2>
               </div>
               {result.grammarPoints && result.grammarPoints.length > 0 ? (
-                <ul className="space-y-3">
-                  {result.grammarPoints.map((g, i) => (
-                    <li key={i} className="analysis-item text-sm" style={{ '--item-color': '#6366f1' } as React.CSSProperties}>
-                      <p className="font-semibold">{g.title || '语法点'}</p>
-                      {g.tags.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          {g.tags.slice(0, 4).map(tag => (
-                            <span key={tag} className="text-[11px] rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5">
-                              {tag}
+                <>
+                  <ul className="space-y-3">
+                    {result.grammarPoints.map((g, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveGrammarIndex(prev => (prev === i ? null : i))}
+                          className={cn(
+                            'w-full text-left analysis-item text-sm transition-colors',
+                            activeGrammarIndex === i && 'ring-1 ring-indigo-300/70 bg-indigo-50/45 dark:bg-indigo-900/30',
+                          )}
+                          style={{ '--item-color': '#6366f1' } as React.CSSProperties}
+                        >
+                          <p className="font-semibold">{g.title || '语法点'}</p>
+                          {g.tags.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {g.tags.slice(0, 4).map(tag => (
+                                <span key={tag} className="text-[11px] rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="mt-1 text-muted-foreground line-clamp-2">{g.explanation}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {activeGrammar && (
+                    <div className="analysis-item mt-4" style={{ '--item-color': '#6366f1' } as React.CSSProperties}>
+                      <p className="font-semibold">{activeGrammar.title || '语法点说明'}</p>
+                      <p className="mt-1 text-muted-foreground">{activeGrammar.explanation}</p>
+                      {linkedPhraseIndexes.size > 0 && result.phrases.length > 0 && (
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {Array.from(linkedPhraseIndexes).slice(0, 4).map(index => (
+                            <span
+                              key={`linked-phrase-${index}`}
+                              className="text-[11px] rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5"
+                            >
+                              {result.phrases[index]?.text || '关联片段'}
                             </span>
                           ))}
                         </div>
                       )}
-                      <p className="mt-1 text-muted-foreground">{g.explanation}</p>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-muted-foreground text-sm py-4 text-center">未检测到特殊语法点</p>
               )}

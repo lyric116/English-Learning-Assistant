@@ -1,5 +1,20 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-25: Grammar-Phrase Linkage (`P2-S-03`)
+
+### `client/src/pages/SentenceAnalysisPage.tsx`
+- Role: sentence grammar interaction coordinator.
+- Changes:
+  - added `activeGrammarIndex` state as grammar-linkage source of truth
+  - grammar items are now interactive toggles (select/deselect)
+  - introduced `linkedPhraseIndexes` derived set:
+    - keyword matching across grammar `title/tags` and phrase `text/category/function/explanation`
+    - fallback to index linkage when no keyword hit exists
+  - phrase list now supports linked-highlight visual state and “已关联” marker
+  - added dedicated active-grammar explanation panel with linked phrase chips
+- UX impact:
+  - users can navigate from abstract grammar points to concrete text fragments in one click.
+
 ## Update 2026-02-25: Sentence Word Hover Panel (`P2-S-02`)
 
 ### `client/src/pages/SentenceAnalysisPage.tsx`

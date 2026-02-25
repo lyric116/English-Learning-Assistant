@@ -30,7 +30,7 @@
 | 24 | P2-F-06 | completed | Flashcards regression checklist executed (`code/flashcards_regression_checklist.md`) + validation gates passed (`cd client && npm run lint`, `npm run build`). |
 | 25 | P2-S-01 | completed | Extended sentence analysis contract with word-level data, phrase category/function, grammar tags, and server/client normalization for backward compatibility. |
 | 26 | P2-S-02 | completed | Implemented in-sentence token hover/click explanation panel (word meaning/POS/role) with closable detail state and legacy-safe token matching. |
-| 27 | P2-S-03 | pending | Not started. |
+| 27 | P2-S-03 | completed | Added grammar-point click linkage: associated phrases are highlighted and a dedicated explanation panel displays active grammar details + linked snippets. |
 | 28 | P2-S-04 | pending | Not started. |
 | 29 | P2-S-05 | pending | Not started. |
 | 30 | P2-R-01 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P2-S-03`.
+- First not-yet-completed step: `P2-S-04`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -1,5 +1,25 @@
 # Progress Log
 
+## 2026-02-25 (complete/p2-s-03-grammar-phrase-linkage)
+
+### Completed
+- Completed `P2-S-03` (短语高亮与语法说明联动).
+- `SentenceAnalysisPage` grammar/phrase linkage updates:
+  - grammar points are now clickable and can be toggled active/inactive
+  - selecting a grammar point highlights linked phrase snippets in the phrase list
+  - added dedicated grammar explanation panel showing active grammar detail + linked phrase chips
+- Added resilient phrase matching strategy:
+  - normalizes grammar title/tags and phrase text/category/function/explanation for matching
+  - falls back to index-based linkage when keyword matching yields no hit
+
+### Validation Performed
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P2-S-03` is complete; grammar-to-text linkage is now visible and interactive.
+- Next step is `P2-S-04` (句子分析结果导出笔记 + 历史沉淀).
+
 ## 2026-02-25 (complete/p2-s-02-word-hover-panel)
 
 ### Completed

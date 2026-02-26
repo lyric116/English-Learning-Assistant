@@ -1,5 +1,37 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-03-frontend-test-baseline)
+
+### Completed
+- Completed `P4-03` (前端自动化测试基础).
+- Constraint-aware approach:
+  - external test framework install was blocked by environment proxy/network policy
+  - implemented zero-dependency baseline using Node 22 native capabilities:
+    - `node:test`
+    - `--experimental-strip-types`
+- Added test command:
+  - `client/package.json` -> `npm run test`
+- Added initial tests:
+  - `client/tests/api-client.test.ts`
+    - standardized response envelope unwrapping
+    - code-aware error message mapping
+    - `api.health` request flow with mocked fetch/localStorage
+  - `client/tests/use-local-storage.test.ts`
+    - storage parse fallback behavior via `safeParseStorageValue`
+- Supporting refactor:
+  - exported `safeParseStorageValue` from `use-local-storage`
+  - exported `unwrapApiPayload` from API client for stable contract assertions
+
+### Validation Performed
+- `cd client && npm run test` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd server && npm run build` ✅
+
+### Notes For Next Developer
+- `P4-03` is complete with a runnable no-network test baseline.
+- Next step is `P4-04` (端到端关键流程测试：阅读 -> 测验 -> 成就).
+
 ## 2026-02-26 (complete/p4-02-response-envelope-error-codes)
 
 ### Completed

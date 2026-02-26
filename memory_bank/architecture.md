@@ -1,5 +1,33 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Frontend Test Baseline (`P4-03`)
+
+### `client/package.json`
+- Added frontend test command:
+  - `npm run test` -> `node --experimental-strip-types --experimental-specifier-resolution=node --test tests/**/*.test.ts`
+
+### `client/tests/api-client.test.ts`
+- Role: API client contract tests.
+- Covers:
+  - unified response envelope unwrapping
+  - non-2xx code/message mapping behavior
+  - mocked `fetch` + storage runtime path for `api.health`
+
+### `client/tests/use-local-storage.test.ts`
+- Role: hook-support utility tests.
+- Covers:
+  - JSON parse success/fallback behavior
+  - null-input fallback behavior
+
+### `client/src/hooks/use-local-storage.ts`
+- Added exported helper `safeParseStorageValue` to isolate and test core parse behavior.
+
+### `client/src/lib/api.ts`
+- Added exported helper `unwrapApiPayload` and `.ts` extension imports for Node strip-types test execution compatibility.
+
+### Architectural Impact
+- Frontend now has an executable automated test baseline without external runner dependencies, enabling CI-ready contract checks for API client behavior and key hook logic.
+
 ## Update 2026-02-26: Response Envelope & Error Codes (`P4-02`)
 
 ### `server/src/utils/response.ts`

@@ -1,7 +1,7 @@
 import type { AIConfig } from '@/types';
-import { STORAGE_KEY } from './ai-providers';
-import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage';
-import { getAnonymousSessionId } from './session';
+import { STORAGE_KEY } from './ai-providers.ts';
+import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage.ts';
+import { getAnonymousSessionId } from './session.ts';
 
 const API_BASE = '/api/v1';
 const REQUEST_TIMEOUT_MS = 95_000;
@@ -23,6 +23,13 @@ type QuizGenerateOptions = {
   timedMode?: boolean;
   timeLimitMinutes?: number;
 };
+type ApiEnvelope = {
+  success?: boolean;
+  code?: string;
+  message?: string;
+  data?: unknown;
+  error?: string;
+};
 
 function isAiRequest(url: string, method: string): boolean {
   return method === 'POST' && url !== '/health';
@@ -37,6 +44,13 @@ function getAIConfig(): AIConfig | null {
   } catch {
     return null;
   }
+}
+
+export function unwrapApiPayload<T>(payload: ApiEnvelope | null): T {
+  if (payload && typeof payload === 'object' && payload.success === true && 'data' in payload) {
+    return payload.data as T;
+  }
+  return payload as T;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -82,10 +96,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
       signal: controller.signal,
     });
 
-    const payload = await res.json().catch(() => null) as (
-      | { success?: boolean; code?: string; message?: string; data?: unknown; error?: string }
-      | null
-    );
+    const payload = await res.json().catch(() => null) as ApiEnvelope | null;
 
     if (!res.ok) {
       if (payload && typeof payload === 'object') {
@@ -96,11 +107,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
       throw new Error(res.statusText || '请求失败');
     }
 
-    if (payload && typeof payload === 'object' && payload.success === true && 'data' in payload) {
-      return payload.data as T;
-    }
-
-    return payload as T;
+    return unwrapApiPayload<T>(payload);
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(`请求超时（>${REQUEST_TIMEOUT_MS / 1000}s），请稍后重试`);

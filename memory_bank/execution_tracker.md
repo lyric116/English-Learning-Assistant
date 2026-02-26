@@ -61,7 +61,7 @@
 | 55 | P4-01 | completed (out-of-order) | Centralized request validation landed on 2026-02-25. |
 | 56 | P4-02 | completed | Unified API response envelope + error-code mapping across server routes/middleware, with client-side response unwrapping and code-aware error messages. |
 | 57 | P4-03 | completed | Added zero-dependency frontend test baseline (`node:test` + `--experimental-strip-types`) covering API client response mapping and local-storage hook parse logic. |
-| 58 | P4-04 | pending | Not started. |
+| 58 | P4-04 | completed | Added executable key-flow simulation (`server/scripts/e2e-main-flow-sim.js`) + checklist (`code/p4_e2e_keyflow_checklist.md`), validated with `cd server && npm run test:e2e-flow`. |
 | 59 | P4-05 | pending | Not started. |
 | 60 | P4-06 | pending | Not started. |
 | 61 | P4-07 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P4-04`.
+- First not-yet-completed step: `P4-05`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

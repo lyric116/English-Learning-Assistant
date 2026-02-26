@@ -1,5 +1,33 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-04-e2e-key-flow-simulation)
+
+### Completed
+- Completed `P4-04` (端到端关键流程测试：阅读 -> 测验 -> 成就) with an executable simulation harness.
+- Added key-flow simulation runner:
+  - `server/scripts/e2e-main-flow-sim.js`
+  - step-based assertions with explicit failure localization:
+    - `db-migrate`
+    - `persist-reading`
+    - `persist-quiz`
+    - `persist-report`
+    - `verify-history`
+- Added server command:
+  - `cd server && npm run test:e2e-flow`
+  - script now includes `build` and uses isolated temporary SQLite DB per run.
+- Added closure checklist artifact:
+  - `code/p4_e2e_keyflow_checklist.md`
+
+### Validation Performed
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P4-04` is complete with a runnable, repeatable key-flow regression command.
+- Next step is `P4-05` (后端自动化测试基础：路由分支与 AI JSON 解析异常覆盖).
+
 ## 2026-02-26 (complete/p4-03-frontend-test-baseline)
 
 ### Completed

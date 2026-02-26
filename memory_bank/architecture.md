@@ -1,5 +1,29 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: E2E Key Flow Simulation (`P4-04`)
+
+### `server/scripts/e2e-main-flow-sim.js`
+- Role: executable main-business-chain regression script.
+- Covers the path:
+  - reading persistence
+  - quiz result persistence
+  - achievements report persistence
+  - history replay verification for all three modules
+- Uses step wrappers (`STEP_OK` / `STEP_FAILED`) for fast failure localization.
+- Enforces isolated DB run by setting `SQLITE_DB_PATH` to a generated `/tmp` file before repository module load.
+
+### `server/package.json`
+- Added command:
+  - `npm run test:e2e-flow` -> `npm run build && node scripts/e2e-main-flow-sim.js`
+- Ensures simulation runs against fresh compiled output in `dist`.
+
+### `code/p4_e2e_keyflow_checklist.md`
+- Role: checklist artifact recording `P4-04` scope, assertions, and validation commands.
+- Documents environment constraint (`listen EPERM`) and why repository-level simulation is used as equivalent regression in sandbox.
+
+### Architectural Impact
+- Main user journey now has an automated, reproducible regression gate with explicit step-level diagnostics, reducing risk before backend test-suite expansion in `P4-05`.
+
 ## Update 2026-02-26: Frontend Test Baseline (`P4-03`)
 
 ### `client/package.json`

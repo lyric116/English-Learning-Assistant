@@ -76,6 +76,18 @@ interface BackfillPayload {
   reportHistory?: Array<LearningReportPayload & { templateType?: string }>;
 }
 
+interface SharedReportRecord {
+  shareId: string;
+  title: string;
+  summary: string;
+  report: LearningReportPayload;
+  viewCount: number;
+  conversionCount: number;
+  createdAt: string;
+}
+
+type ShareEventType = 'visit' | 'convert';
+
 function normalizeOwnerId(rawOwnerId: string | undefined): string {
   const trimmed = (rawOwnerId || '').trim();
   return trimmed || 'anonymous-default';
@@ -342,6 +354,121 @@ class LearningDataRepository {
       }
       return { ...parsed, timestamp: item.timestamp };
     });
+  }
+
+  createSharedReport(ownerIdRaw: string | undefined, report: LearningReportPayload): { shareId: string } | null {
+    if (!this.enabled || !this.available) return null;
+    const shareId = randomUUID().replace(/-/g, '');
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+
+    const script = `
+      INSERT INTO report_shares (
+        id, owner_type, owner_id, title, summary, report_json, created_at, updated_at
+      ) VALUES (
+        ${SqliteClient.sqlLiteral(shareId)},
+        ${SqliteClient.sqlLiteral(ownerType)},
+        ${SqliteClient.sqlLiteral(ownerId)},
+        ${SqliteClient.sqlLiteral(readReportField(report, 'title'))},
+        ${SqliteClient.sqlLiteral(readReportField(report, 'summary'))},
+        ${SqliteClient.sqlLiteral(JSON.stringify(report))},
+        datetime('now'),
+        datetime('now')
+      );
+    `;
+
+    try {
+      this.sqlite.execute(script);
+      logger.info('repository.write.ok', { module: 'share', action: 'insert_report_share' });
+      return { shareId };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('repository.write.failed', { module: 'share', action: 'insert_report_share', error: message });
+      return null;
+    }
+  }
+
+  getSharedReport(shareIdRaw: string): SharedReportRecord | null {
+    if (!this.enabled || !this.available) return null;
+    const shareId = (shareIdRaw || '').trim();
+    if (!shareId) return null;
+
+    const query = `
+      SELECT
+        id AS shareId,
+        COALESCE(title, '') AS title,
+        COALESCE(summary, '') AS summary,
+        report_json AS reportJson,
+        CAST(COALESCE(view_count, 0) AS INTEGER) AS viewCount,
+        CAST(COALESCE(conversion_count, 0) AS INTEGER) AS conversionCount,
+        datetime(created_at) AS createdAt
+      FROM report_shares
+      WHERE id = ${SqliteClient.sqlLiteral(shareId)}
+      LIMIT 1;
+    `;
+
+    const rows = this.query<{
+      shareId: string;
+      title: string;
+      summary: string;
+      reportJson: string;
+      viewCount: number;
+      conversionCount: number;
+      createdAt: string;
+    }>('share', 'select_report_share', query);
+
+    const row = rows[0];
+    if (!row) return null;
+
+    let report: LearningReportPayload = {};
+    try {
+      const parsed = JSON.parse(row.reportJson || '{}');
+      report = parsed && typeof parsed === 'object' ? parsed as LearningReportPayload : {};
+    } catch {
+      report = {};
+    }
+
+    return {
+      shareId: row.shareId,
+      title: row.title,
+      summary: row.summary,
+      report,
+      viewCount: row.viewCount,
+      conversionCount: row.conversionCount,
+      createdAt: row.createdAt,
+    };
+  }
+
+  trackSharedReportEvent(shareIdRaw: string, eventType: ShareEventType): boolean {
+    if (!this.enabled || !this.available) return false;
+    const shareId = (shareIdRaw || '').trim();
+    if (!shareId) return false;
+
+    const script = eventType === 'convert'
+      ? `
+        UPDATE report_shares
+        SET conversion_count = conversion_count + 1,
+            last_conversion_at = datetime('now'),
+            updated_at = datetime('now')
+        WHERE id = ${SqliteClient.sqlLiteral(shareId)};
+      `
+      : `
+        UPDATE report_shares
+        SET view_count = view_count + 1,
+            last_view_at = datetime('now'),
+            updated_at = datetime('now')
+        WHERE id = ${SqliteClient.sqlLiteral(shareId)};
+      `;
+
+    try {
+      this.sqlite.execute(script);
+      logger.info('repository.write.ok', { module: 'share', action: `track_${eventType}` });
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('repository.write.failed', { module: 'share', action: `track_${eventType}`, error: message });
+      return false;
+    }
   }
 
   persistFlashcards(ownerIdRaw: string | undefined, words: FlashcardRecord[]): void {

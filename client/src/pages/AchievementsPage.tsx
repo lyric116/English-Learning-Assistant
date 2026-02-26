@@ -333,6 +333,8 @@ export function AchievementsPage() {
   const [historyHydrated, setHistoryHydrated] = useState(false);
   const [report, setReport] = useState<LearningReport | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [shareLinkLoading, setShareLinkLoading] = useState(false);
   const [flashcards] = useLocalStorage<Word[]>('flashcards', []);
   const [flashcardSessionSummary] = useLocalStorage<FlashcardSessionSummary | null>('flashcardSessionSummary', null);
   const [readingHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
@@ -438,6 +440,30 @@ export function AchievementsPage() {
       setShowShare(false);
     }).catch(() => {
       toast('复制失败，请手动复制内容', 'error');
+    });
+  };
+
+  const generateShareLink = async () => {
+    if (!report) return;
+    setShareLinkLoading(true);
+    try {
+      const result = await api.report.createShare(report) as { shareId: string; sharePath: string };
+      const absolute = `${window.location.origin}${result.sharePath}`;
+      setShareLink(absolute);
+      toast('分享链接已生成', 'success');
+    } catch (err) {
+      toast(`生成分享链接失败: ${(err as Error).message}`, 'error');
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
+  const copyShareLink = () => {
+    if (!shareLink) return;
+    navigator.clipboard.writeText(shareLink).then(() => {
+      toast('分享链接已复制', 'success');
+    }).catch(() => {
+      toast('复制链接失败', 'error');
     });
   };
 
@@ -828,11 +854,17 @@ export function AchievementsPage() {
 
     {/* Share dialog — outside all animated containers */}
     {showShare && report && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop" onClick={() => setShowShare(false)}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop" onClick={() => {
+        setShowShare(false);
+        setShareLink('');
+      }}>
         <div className="bg-card p-6 rounded-xl shadow-2xl max-w-md w-full mx-4 modal-content" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold">分享学习成就</h3>
-            <button onClick={() => setShowShare(false)} className="tap-target p-1 rounded-full hover:bg-muted transition">
+            <button onClick={() => {
+              setShowShare(false);
+              setShareLink('');
+            }} className="tap-target p-1 rounded-full hover:bg-muted transition">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -849,10 +881,22 @@ export function AchievementsPage() {
               <Share2 className="h-4 w-4 mr-1.5" />
               复制结构化内容
             </Button>
+            <Button size="sm" variant="secondary" loading={shareLinkLoading} onClick={generateShareLink}>
+              生成分享链接
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => setShowShare(false)}>
               关闭
             </Button>
           </div>
+          {shareLink && (
+            <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground mb-1">分享链接</p>
+              <p className="text-xs break-all mb-2">{shareLink}</p>
+              <Button size="sm" variant="ghost" onClick={copyShareLink}>
+                复制链接
+              </Button>
+            </div>
+          )}
           <div className="bg-muted rounded-lg p-3 text-sm">
             <p className="font-medium mb-1">{report.title}</p>
             <p className="text-muted-foreground text-xs line-clamp-2">{report.summary}</p>

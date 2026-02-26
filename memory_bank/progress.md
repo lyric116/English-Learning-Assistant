@@ -1,5 +1,42 @@
 # Progress Log
 
+## 2026-02-26 (complete/p5-02-share-landing-growth-tracking)
+
+### Completed
+- Completed `P5-02` (分享落地页与增长埋点).
+- Backend delivery:
+  - migration `server/migrations/003_create_report_shares.sql`
+  - report share APIs:
+    - `POST /api/v1/report/share`
+    - `GET /api/v1/report/share/:shareId`
+    - `POST /api/v1/report/share/:shareId/events`
+  - repository support for shared-report create/read/event tracking.
+- Frontend delivery:
+  - new share landing page: `client/src/pages/SharedReportPage.tsx` (`/share/:shareId`)
+  - Achievements share modal supports link generation and link copy.
+  - share-page events:
+    - page load -> `visit`
+    - CTA click -> `convert`
+- API client extensions:
+  - `report.createShare`
+  - `report.getShared`
+  - `report.trackShareEvent`
+- Added closure artifact:
+  - `code/p5_share_growth_baseline.md`
+
+### Validation Performed
+- `cd server && SQLITE_DB_PATH=/tmp/english-learning-p502.db npm run db:migrate` ✅
+- `cd server && npm run build` ✅
+- `cd server && npm run test` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P5-02` is complete with anonymous-access share links and basic growth event tracking.
+- Next step is `P5-03` (预发 UAT 与回滚演练脚本/记录).
+
 ## 2026-02-26 (complete/p5-01-ai-provider-strategy)
 
 ### Completed

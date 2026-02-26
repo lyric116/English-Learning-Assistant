@@ -8,6 +8,7 @@ import { SentenceAnalysisPage } from '@/pages/SentenceAnalysisPage';
 import { ReadingPage } from '@/pages/ReadingPage';
 import { QuizPage } from '@/pages/QuizPage';
 import { AchievementsPage } from '@/pages/AchievementsPage';
+import { SharedReportPage } from '@/pages/SharedReportPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { api } from '@/lib/api';
 
@@ -69,6 +70,7 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <Routes>
+          <Route path="/share/:shareId" element={<SharedReportPage />} />
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/flashcards" element={<FlashcardsPage />} />

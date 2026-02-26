@@ -1,5 +1,41 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Share Landing & Growth Tracking (`P5-02`)
+
+### `server/migrations/003_create_report_shares.sql`
+- Added persistent share table `report_shares` with:
+  - share payload storage
+  - `view_count` / `conversion_count`
+  - last event timestamps for visit/conversion
+
+### `server/src/repositories/learning-data-repository.ts`
+- Added share data operations:
+  - `createSharedReport`
+  - `getSharedReport`
+  - `trackSharedReportEvent`
+
+### `server/src/routes/report.ts`
+- Added share endpoints:
+  - `POST /report/share`
+  - `GET /report/share/:shareId`
+  - `POST /report/share/:shareId/events`
+
+### `client/src/lib/api.ts`
+- Added share API client methods:
+  - `report.createShare`
+  - `report.getShared`
+  - `report.trackShareEvent`
+
+### `client/src/pages/AchievementsPage.tsx`
+- Share modal now supports generating/copying public share links in addition to structured text copy.
+
+### `client/src/pages/SharedReportPage.tsx`
+- New anonymous-friendly share landing page route (`/share/:shareId`).
+- Automatically records `visit` and tracks `convert` on CTA action.
+
+### Architectural Impact
+- Report sharing now moves from plain clipboard export to link-based distribution with measurable access/conversion events, enabling a basic growth funnel loop.
+
 ## Update 2026-02-26: AI Provider Strategy (`P5-01`)
 
 ### `server/src/config.ts`

@@ -181,6 +181,26 @@ export const api = {
       }),
     history: (limit = 20) =>
       request(`/report/history?limit=${encodeURIComponent(String(limit))}`),
+    createShare: (report: unknown) =>
+      request<{ shareId: string; sharePath: string }>('/report/share', {
+        method: 'POST',
+        body: JSON.stringify({ report }),
+      }),
+    getShared: (shareId: string) =>
+      request<{
+        shareId: string;
+        title: string;
+        summary: string;
+        report: Record<string, unknown>;
+        viewCount: number;
+        conversionCount: number;
+        createdAt: string;
+      }>(`/report/share/${encodeURIComponent(shareId)}`),
+    trackShareEvent: (shareId: string, eventType: 'visit' | 'convert') =>
+      request<{ ok: boolean }>(`/report/share/${encodeURIComponent(shareId)}/events`, {
+        method: 'POST',
+        body: JSON.stringify({ eventType }),
+      }),
   },
   health: () => request<{ status: string }>('/health'),
   ai: {

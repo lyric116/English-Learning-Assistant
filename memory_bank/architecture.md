@@ -1,5 +1,28 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: CI Gate & Release Checklist (`P4-07`)
+
+### `.github/workflows/ci.yml`
+- Role: repository quality gate workflow.
+- Pipeline includes:
+  - server: `npm ci` -> `build` -> `test` -> `test:e2e-flow`
+  - client: `npm ci` -> `lint` -> `build` -> `test`
+- Trigger scope:
+  - `pull_request`
+  - `push` for `main` and `feat/**`
+
+### `code/release_preflight_checklist.md`
+- Role: release-time operational checklist.
+- Covers:
+  - quality commands
+  - environment/security validation
+  - migration safety checks
+  - observability (`x-trace-id` and structured log events)
+  - manual production-like smoke items
+
+### Architectural Impact
+- Quality enforcement is now externalized from local workflow into CI automation, and release readiness has a standardized checklist to reduce deployment-time omissions.
+
 ## Update 2026-02-26: Structured Logging & Trace (`P4-06`)
 
 ### `server/src/middleware/request-tracing.ts`

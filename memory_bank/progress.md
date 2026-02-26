@@ -1,5 +1,39 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-07-ci-gate-release-checklist)
+
+### Completed
+- Completed `P4-07` (CI 门禁与发布检查清单).
+- Added CI quality gate workflow:
+  - `.github/workflows/ci.yml`
+  - includes:
+    - server: install, build, test, key-flow regression (`test:e2e-flow`)
+    - client: install, lint, build, test
+  - triggers:
+    - `pull_request`
+    - `push` on `main` and `feat/**`
+- Added release preflight checklist:
+  - `code/release_preflight_checklist.md`
+  - covers:
+    - quality gate commands
+    - env/security checks
+    - migration safety checks
+    - trace/observability checks
+    - manual production-like smoke
+
+### Validation Performed
+- CI equivalent commands were already executed locally in current session and all passed:
+  - `cd server && npm run build` ✅
+  - `cd server && npm run test` ✅
+  - `cd server && npm run test:e2e-flow` ✅
+  - `cd client && npm run lint` ✅
+  - `cd client && npm run build` ✅
+  - `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P4-07` is complete; phase-4 quality gate is now codified in CI and release checklist artifacts.
+- Next step is `P5-01` (上线 AI 供应商策略：白名单、配额阈值、失败回退).
+
 ## 2026-02-26 (complete/p4-06-structured-logging-tracing)
 
 ### Completed

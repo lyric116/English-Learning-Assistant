@@ -44,6 +44,19 @@ interface SafeJsonResult<T = unknown> {
   rawText?: string;
 }
 
+interface ProviderCandidate extends AIConfig {
+  name: string;
+  source: 'primary' | 'fallback';
+  dailyQuota: number;
+}
+
+interface ProviderQuotaState {
+  date: string;
+  count: number;
+}
+
+const providerQuotaState = new Map<string, ProviderQuotaState>();
+
 function isPrivateOrLocalhost(hostname: string): boolean {
   const host = hostname.toLowerCase();
 
@@ -146,6 +159,121 @@ function readHost(baseUrl: string): string {
   }
 }
 
+function currentDateKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function quotaCacheKey(provider: ProviderCandidate): string {
+  return `${provider.source}:${provider.name}:${readHost(provider.baseUrl)}:${provider.model}`;
+}
+
+function reserveQuota(provider: ProviderCandidate): boolean {
+  const key = quotaCacheKey(provider);
+  const today = currentDateKey();
+  const state = providerQuotaState.get(key);
+
+  if (!state || state.date !== today) {
+    providerQuotaState.set(key, { date: today, count: 1 });
+    return true;
+  }
+
+  if (state.count >= provider.dailyQuota) {
+    return false;
+  }
+
+  state.count += 1;
+  providerQuotaState.set(key, state);
+  return true;
+}
+
+function buildProviderCandidates(primary: AIConfig): ProviderCandidate[] {
+  const primaryCandidate: ProviderCandidate = {
+    ...primary,
+    name: 'primary',
+    source: 'primary',
+    dailyQuota: config.ai.primaryDailyQuota,
+  };
+
+  const candidates: ProviderCandidate[] = [primaryCandidate];
+  for (const fallback of config.ai.fallbackProviders) {
+    try {
+      const normalizedBaseUrl = validateBaseUrl(fallback.baseUrl);
+      candidates.push({
+        apiKey: fallback.apiKey,
+        baseUrl: normalizedBaseUrl,
+        model: fallback.model,
+        name: fallback.name,
+        source: 'fallback',
+        dailyQuota: fallback.dailyQuota,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'fallback 配置无效';
+      logger.warn('ai.provider.fallback.invalid', {
+        provider: fallback.name,
+        error: sanitizeErrorText(message),
+      });
+    }
+  }
+
+  return candidates;
+}
+
+async function withProviderFallback<T>(
+  primary: AIConfig,
+  action: string,
+  runner: (provider: ProviderCandidate) => Promise<T>,
+): Promise<T> {
+  const candidates = buildProviderCandidates(primary);
+  let lastError: Error | undefined;
+  let attempted = 0;
+
+  for (const provider of candidates) {
+    if (!reserveQuota(provider)) {
+      logger.warn('ai.provider.quota.exhausted', {
+        action,
+        provider: provider.name,
+        source: provider.source,
+        providerHost: readHost(provider.baseUrl),
+        model: provider.model,
+        dailyQuota: provider.dailyQuota,
+      });
+      continue;
+    }
+
+    attempted += 1;
+    if (provider.source === 'fallback') {
+      logger.warn('ai.provider.fallback.activated', {
+        action,
+        provider: provider.name,
+        providerHost: readHost(provider.baseUrl),
+        model: provider.model,
+      });
+    }
+
+    try {
+      return await runner(provider);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      lastError = error instanceof Error ? error : new Error(String(error));
+      logger.warn('ai.provider.attempt.failed', {
+        action,
+        provider: provider.name,
+        source: provider.source,
+        providerHost: readHost(provider.baseUrl),
+        model: provider.model,
+        error: sanitizeErrorText(message),
+      });
+    }
+  }
+
+  if (attempted === 0) {
+    throw new Error('AI 服务配额已达上限，请稍后再试');
+  }
+
+  if (lastError) throw lastError;
+  throw new Error('AI 服务暂时不可用，请稍后重试');
+}
+
 function validateAIConfig(aiConfig?: AIConfig): asserts aiConfig is AIConfig {
   if (!aiConfig) {
     throw new Error('请先在页面设置中配置 AI 服务（API Key、Base URL、Model）');
@@ -241,54 +369,60 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
 
 async function sendRequest(prompt: string, options: { temperature?: number; maxTokens?: number } = {}, aiConfig?: AIConfig): Promise<string> {
   validateAIConfig(aiConfig);
-  const startedAt = Date.now();
-  const providerHost = readHost(aiConfig.baseUrl);
-  let res: Response;
+  return withProviderFallback(aiConfig, 'chat_completion', async provider => {
+    const startedAt = Date.now();
+    const providerHost = readHost(provider.baseUrl);
+    let res: Response;
 
-  try {
-    res = await postChatCompletions(aiConfig, {
-      model: aiConfig.model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2000,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '未知错误';
-    logger.error('ai.request.failed', {
+    try {
+      res = await postChatCompletions(provider, {
+        model: provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 2000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      logger.error('ai.request.failed', {
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        durationMs: Date.now() - startedAt,
+        error: sanitizeErrorText(message),
+      });
+      throw error;
+    }
+
+    logger.info('ai.request.completed', {
       providerHost,
-      model: aiConfig.model,
+      provider: provider.name,
+      source: provider.source,
+      model: provider.model,
+      statusCode: res.status,
+      ok: res.ok,
       durationMs: Date.now() - startedAt,
-      error: sanitizeErrorText(message),
     });
-    throw error;
-  }
 
-  logger.info('ai.request.completed', {
-    providerHost,
-    model: aiConfig.model,
-    statusCode: res.status,
-    ok: res.ok,
-    durationMs: Date.now() - startedAt,
+    if (!res.ok) {
+      const errBody = await safeReadJson<ErrorBody>(res);
+      const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+      const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
+      throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
+    }
+
+    const dataResult = await safeReadJson<ChatCompletionResponse>(res);
+    if (!dataResult.ok || !dataResult.data) {
+      throw new Error('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
+    }
+
+    const data = dataResult.data;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('AI 返回内容为空，请稍后重试');
+    }
+    return content;
   });
-
-  if (!res.ok) {
-    const errBody = await safeReadJson<ErrorBody>(res);
-    const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
-    const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
-    throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
-  }
-
-  const dataResult = await safeReadJson<ChatCompletionResponse>(res);
-  if (!dataResult.ok || !dataResult.data) {
-    throw new Error('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
-  }
-
-  const data = dataResult.data;
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('AI 返回内容为空，请稍后重试');
-  }
-  return content;
 }
 
 export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
@@ -333,45 +467,51 @@ export async function generateLearningReport(reportType: string, learningData: u
 
 export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
   validateAIConfig(aiConfig);
-  const startedAt = Date.now();
-  const providerHost = readHost(aiConfig.baseUrl);
-  let res: Response;
+  return withProviderFallback(aiConfig, 'connection_test', async provider => {
+    const startedAt = Date.now();
+    const providerHost = readHost(provider.baseUrl);
+    let res: Response;
 
-  try {
-    res = await postChatCompletions(aiConfig, {
-      model: aiConfig.model,
-      messages: [{ role: 'user', content: 'Hi' }],
-      max_tokens: 5,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '未知错误';
-    logger.error('ai.connection.failed', {
+    try {
+      res = await postChatCompletions(provider, {
+        model: provider.model,
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      logger.error('ai.connection.failed', {
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        durationMs: Date.now() - startedAt,
+        error: sanitizeErrorText(message),
+      });
+      throw error;
+    }
+
+    logger.info('ai.connection.completed', {
       providerHost,
-      model: aiConfig.model,
+      provider: provider.name,
+      source: provider.source,
+      model: provider.model,
+      statusCode: res.status,
+      ok: res.ok,
       durationMs: Date.now() - startedAt,
-      error: sanitizeErrorText(message),
     });
-    throw error;
-  }
 
-  logger.info('ai.connection.completed', {
-    providerHost,
-    model: aiConfig.model,
-    statusCode: res.status,
-    ok: res.ok,
-    durationMs: Date.now() - startedAt,
+    if (!res.ok) {
+      const errBody = await safeReadJson<ErrorBody>(res);
+      const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+      const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
+      throw new Error(`连接失败: ${sanitizeErrorText(upstreamMessage)}`);
+    }
+
+    const okBody = await safeReadJson(res);
+    if (!okBody.ok) {
+      throw new Error('连接失败: 上游返回非 JSON 内容');
+    }
+    return { success: true, model: provider.model };
   });
-
-  if (!res.ok) {
-    const errBody = await safeReadJson<ErrorBody>(res);
-    const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
-    const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
-    throw new Error(`连接失败: ${sanitizeErrorText(upstreamMessage)}`);
-  }
-
-  const okBody = await safeReadJson(res);
-  if (!okBody.ok) {
-    throw new Error('连接失败: 上游返回非 JSON 内容');
-  }
-  return { success: true, model: aiConfig.model };
 }

@@ -1,5 +1,36 @@
 # Progress Log
 
+## 2026-02-26 (complete/p5-01-ai-provider-strategy)
+
+### Completed
+- Completed `P5-01` (上线 AI 供应商策略).
+- Added provider strategy config in `server/src/config.ts`:
+  - `AI_PROVIDER_PRIMARY_DAILY_QUOTA`
+  - `AI_PROVIDER_FALLBACK_DAILY_QUOTA`
+  - `AI_FALLBACK_PROVIDERS` (JSON array)
+- Added failover + quota policy in `server/src/services/ai-service.ts`:
+  - primary provider from request `aiConfig`
+  - fallback providers from env config
+  - per-provider daily in-memory quota reservation
+  - fallback activation when provider fails or quota exhausted
+  - structured logs for quota/fallback/attempt-failure events
+- Added env template:
+  - `.env.example`
+- Added closure artifact:
+  - `code/p5_ai_provider_strategy.md`
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd server && npm run test` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P5-01` is complete with enforceable fallback/quota behavior and whitelist compatibility.
+- Next step is `P5-02` (分享落地页与增长埋点).
+
 ## 2026-02-26 (complete/p4-07-ci-gate-release-checklist)
 
 ### Completed

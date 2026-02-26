@@ -1,5 +1,31 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: AI Provider Strategy (`P5-01`)
+
+### `server/src/config.ts`
+- Added provider strategy configuration parsing:
+  - primary daily quota
+  - fallback provider daily quota default
+  - fallback provider list from `AI_FALLBACK_PROVIDERS` JSON
+
+### `server/src/services/ai-service.ts`
+- Added provider candidate model (`primary + fallback`).
+- Added per-provider daily quota reservation (in-memory).
+- Added sequential fallback execution wrapper:
+  - skips exhausted providers
+  - activates fallback provider on previous attempt failure
+  - emits structured policy logs for quota/fallback/attempt failure
+- Fallback providers still pass existing base-url safety validation and whitelist constraints.
+
+### `.env.example`
+- Added environment template for provider strategy and security toggles.
+
+### `code/p5_ai_provider_strategy.md`
+- Role: `P5-01` closure doc with config contract, runtime behavior, and validation evidence.
+
+### Architectural Impact
+- AI layer now has an explicit resilience policy for quota control and provider failover, reducing single-provider outage risk in production rollout.
+
 ## Update 2026-02-26: CI Gate & Release Checklist (`P4-07`)
 
 ### `.github/workflows/ci.yml`

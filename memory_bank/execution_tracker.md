@@ -65,11 +65,11 @@
 | 59 | P4-05 | completed | Added backend zero-dependency tests (`server/tests/request-validator.test.ts`, `server/tests/json-parser.test.ts`) + command `cd server && npm run test`, with baseline doc `code/p4_backend_test_baseline.md`. |
 | 60 | P4-06 | completed | Added trace-aware structured logging (`request-tracing` + `request-context`), AI call telemetry (`ai.request/ai.connection`), and error-context logs; see `code/p4_observability_baseline.md`. |
 | 61 | P4-07 | completed | Added CI gate workflow (`.github/workflows/ci.yml`) covering server/client lint-build-test and key-flow regression, plus release checklist `code/release_preflight_checklist.md`. |
-| 62 | P5-01 | pending | Not started. |
+| 62 | P5-01 | completed | Implemented AI provider strategy (whitelist-compatible fallback providers + per-provider daily quota + failover attempts), with env template and doc `code/p5_ai_provider_strategy.md`. |
 | 63 | P5-02 | pending | Not started. |
 | 64 | P5-03 | pending | Not started. |
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P5-01`.
+- First not-yet-completed step: `P5-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

@@ -10,7 +10,8 @@
     "db:migrate:test": "SQLITE_DB_PATH=/tmp/english-learning-migration-test.db node scripts/migrate.js",
     "test:e2e-flow": "npm run build && node scripts/e2e-main-flow-sim.js",
     "test": "node --experimental-strip-types --experimental-specifier-resolution=node --test tests/**/*.test.ts",
-    "drill:rollback": "node scripts/rollback-drill.js"
+    "drill:rollback": "node scripts/rollback-drill.js",
+    "ops:daily-report": "node scripts/ops-daily-report.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

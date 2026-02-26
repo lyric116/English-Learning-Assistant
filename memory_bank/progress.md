@@ -1,5 +1,32 @@
 # Progress Log
 
+## 2026-02-26 (complete/p5-04-release-observation-window)
+
+### Completed
+- Completed `P5-04` (生产发布与 14 天观察期机制).
+- Added daily observation automation:
+  - `server/scripts/ops-daily-report.js`
+  - `cd server && npm run ops:daily-report`
+  - output file: `code/ops_daily_report_YYYY-MM-DD.md`
+- Added release observation planning doc:
+  - `code/p5_production_observation_plan.md`
+- Generated first daily report artifact:
+  - `code/ops_daily_report_2026-02-26.md`
+
+### Validation Performed
+- `cd server && SQLITE_DB_PATH=/tmp/english-learning-p504.db npm run db:migrate` ✅
+- `cd server && SQLITE_DB_PATH=/tmp/english-learning-p504.db npm run ops:daily-report` ✅
+- `cd server && npm run build` ✅
+- `cd server && npm run test` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P5-04` is complete; current implementation plan (`P0-01` ~ `P5-04`) is fully closed.
+- Next practical step is running the daily-report command in real production DB context for continuous 14-day observation records.
+
 ## 2026-02-26 (complete/p5-03-preprod-uat-rollback-drill)
 
 ### Completed

@@ -1,5 +1,30 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Production Observation Window (`P5-04`)
+
+### `server/scripts/ops-daily-report.js`
+- Role: daily operational metrics generator.
+- Reads SQLite metrics (activity + share funnel) and writes markdown daily report.
+- Output naming:
+  - `code/ops_daily_report_YYYY-MM-DD.md`
+
+### `server/package.json`
+- Added command:
+  - `npm run ops:daily-report`
+
+### `code/p5_production_observation_plan.md`
+- Role: 14-day post-release observation playbook.
+- Defines:
+  - daily execution cadence
+  - phased observation focus (D1-3, D4-10, D11-14)
+  - end-of-window Top-3 prioritization template
+
+### `code/ops_daily_report_2026-02-26.md`
+- First generated daily-report artifact proving the mechanism is runnable.
+
+### Architectural Impact
+- Project now has a repeatable post-release metrics loop and artifacted daily reporting path, enabling the transition from one-time delivery to data-driven iteration cadence.
+
 ## Update 2026-02-26: Preprod UAT & Rollback Drill (`P5-03`)
 
 ### `server/scripts/rollback-drill.js`

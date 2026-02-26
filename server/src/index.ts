@@ -8,6 +8,7 @@ import { sentenceRouter } from './routes/sentence';
 import { readingRouter } from './routes/reading';
 import { quizRouter } from './routes/quiz';
 import { reportRouter } from './routes/report';
+import { migrationRouter } from './routes/migration';
 import { testConnection } from './services/ai-service';
 import { validateAiTestPayload } from './utils/request-validator';
 
@@ -37,6 +38,8 @@ app.get('/api/v1', (_req, res) => {
       'POST /api/v1/quiz/reading-questions',
       'POST /api/v1/quiz/vocabulary-questions',
       'POST /api/v1/report/generate',
+      'GET /api/v1/migration/status',
+      'POST /api/v1/migration/backfill',
     ],
   });
 });
@@ -58,6 +61,7 @@ app.use('/api/v1/sentence', sentenceRouter);
 app.use('/api/v1/reading', readingRouter);
 app.use('/api/v1/quiz', quizRouter);
 app.use('/api/v1/report', reportRouter);
+app.use('/api/v1/migration', migrationRouter);
 app.use('/api/v1', (_req, res) => {
   res.status(404).json({ error: 'API 路由不存在' });
 });

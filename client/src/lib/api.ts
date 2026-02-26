@@ -170,4 +170,13 @@ export const api = {
         body: JSON.stringify({ aiConfig }),
       }),
   },
+  migration: {
+    status: () =>
+      request<Record<string, number>>('/migration/status'),
+    backfill: (payload: unknown) =>
+      request<{ ok: boolean; synced: Record<string, number> }>('/migration/backfill', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  },
 };

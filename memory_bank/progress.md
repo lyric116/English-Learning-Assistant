@@ -1,5 +1,36 @@
 # Progress Log
 
+## 2026-02-26 (complete/p3-08-dual-write-backfill)
+
+### Completed
+- Completed `P3-08` (双写与回填策略).
+- Backend migration APIs:
+  - `GET /api/v1/migration/status` (owner-level record counts)
+  - `POST /api/v1/migration/backfill` (bulk local-history backfill)
+- Repository additions:
+  - `getBackfillStatus(ownerId)`
+  - `runBackfill(ownerId, payload)` for flashcards/sentence/reading/quiz/report datasets
+- Frontend bootstrap backfill:
+  - `client/src/App.tsx` now runs one-time local-data backfill on app start
+  - behavior:
+    - checks backend status counts first
+    - if backend empty and local data exists, uploads all module history payloads
+    - uses local mark key `migration-backfill-v1` to avoid repeated backfill storms
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `SQLITE_DB_PATH=/tmp/english-learning-p308-test.db npm run db:migrate` ✅
+- Repository-level backfill validation:
+  - before counts all `0`
+  - backfill synced each module `1`
+  - after counts all `1` ✅
+
+### Notes For Next Developer
+- `P3-08` is complete; dual-write transition now includes a runnable local->server backfill path.
+- Next step is `P3-09` (架构阶段集成回归：阅读 -> 测验 -> 成就全链路场景).
+
 ## 2026-02-26 (complete/p3-07-reading-quiz-report-backend-replay)
 
 ### Completed

@@ -1,5 +1,38 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Dual-Write Backfill Strategy (`P3-08`)
+
+### `server/src/routes/migration.ts`
+- Added migration control endpoints:
+  - `GET /api/v1/migration/status`
+  - `POST /api/v1/migration/backfill`
+- Purpose: expose owner-scoped server record counts and accept one-shot historical backfill payloads.
+
+### `server/src/repositories/learning-data-repository.ts`
+- Added migration helpers:
+  - `getBackfillStatus(ownerId)` returns module-level counts (`flashcards/sentence/readings/quiz/reports`).
+  - `runBackfill(ownerId, payload)` imports local historical datasets into repository write pipeline.
+- Reuses module persistence methods to keep write behavior consistent with existing routes.
+
+### `client/src/App.tsx`
+- Added app-start one-time backfill bootstrap:
+  - reads local module histories
+  - checks backend status first
+  - uploads backfill payload only when backend is empty
+  - stores local idempotency mark (`migration-backfill-v1`) to avoid repeated upload loops.
+
+### `client/src/lib/api.ts`
+- Added migration API client:
+  - `api.migration.status()`
+  - `api.migration.backfill(payload)`
+
+### `server/src/index.ts`
+- Mounted migration router under `/api/v1/migration`.
+- API root endpoint list now includes migration endpoints.
+
+### Architectural Impact
+- Transition phase now has an explicit local+server双写补全通道 with deterministic bootstrap behavior, reducing risk of legacy local data loss during persistence migration rollout.
+
 ## Update 2026-02-26: Second-Batch Persistence Replay (`P3-07`)
 
 ### `server/src/repositories/learning-data-repository.ts`

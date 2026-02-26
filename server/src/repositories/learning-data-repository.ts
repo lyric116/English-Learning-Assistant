@@ -68,6 +68,14 @@ interface QuizHistoryRecord {
   timeSpentSeconds?: number;
 }
 
+interface BackfillPayload {
+  flashcards?: FlashcardRecord[];
+  sentenceHistory?: SentenceHistoryRecord[];
+  readingHistory?: ReadingHistoryRecord[];
+  testHistory?: QuizHistoryRecord[];
+  reportHistory?: Array<LearningReportPayload & { templateType?: string }>;
+}
+
 function normalizeOwnerId(rawOwnerId: string | undefined): string {
   const trimmed = (rawOwnerId || '').trim();
   return trimmed || 'anonymous-default';
@@ -518,6 +526,78 @@ class LearningDataRepository {
     `;
 
     this.execute('achievements', 'insert_report', script);
+  }
+
+  getBackfillStatus(ownerIdRaw: string | undefined): Record<string, number> {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const counts = (table: string) => `
+      (SELECT COUNT(*) FROM ${table}
+        WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+          AND owner_id = ${SqliteClient.sqlLiteral(ownerId)})`;
+    const query = `
+      SELECT
+        ${counts('flashcards')} AS flashcards,
+        ${counts('sentence_analyses')} AS sentence_analyses,
+        ${counts('reading_contents')} AS reading_contents,
+        ${counts('quiz_attempts')} AS quiz_attempts,
+        ${counts('learning_reports')} AS learning_reports;
+    `;
+    const rows = this.query<Record<string, number>>('migration', 'status_counts', query);
+    return rows[0] || {
+      flashcards: 0,
+      sentence_analyses: 0,
+      reading_contents: 0,
+      quiz_attempts: 0,
+      learning_reports: 0,
+    };
+  }
+
+  runBackfill(ownerIdRaw: string | undefined, payload: BackfillPayload): Record<string, number> {
+    const flashcards = Array.isArray(payload.flashcards) ? payload.flashcards.slice(0, 500) : [];
+    const sentenceHistory = Array.isArray(payload.sentenceHistory) ? payload.sentenceHistory.slice(0, 300) : [];
+    const readingHistory = Array.isArray(payload.readingHistory) ? payload.readingHistory.slice(0, 300) : [];
+    const testHistory = Array.isArray(payload.testHistory) ? payload.testHistory.slice(0, 300) : [];
+    const reportHistory = Array.isArray(payload.reportHistory) ? payload.reportHistory.slice(0, 200) : [];
+
+    if (flashcards.length > 0) {
+      this.persistFlashcards(ownerIdRaw, flashcards);
+    }
+    sentenceHistory.forEach(item => {
+      if (typeof item.sentence === 'string') {
+        this.persistSentenceAnalysis(ownerIdRaw, item.sentence, item.result);
+      }
+    });
+    readingHistory.forEach(item => {
+      if (typeof item.english === 'string' && typeof item.chinese === 'string') {
+        this.persistReadingContent(ownerIdRaw, {
+          language: item.generationConfig?.language || 'en',
+          topic: item.generationConfig?.topic || 'general',
+          difficulty: item.generationConfig?.difficulty || 'medium',
+          length: item.generationConfig?.length || 'medium',
+          title: item.title,
+          english: item.english,
+          chinese: item.chinese,
+          vocabulary: Array.isArray(item.vocabulary) ? item.vocabulary : [],
+        });
+      }
+    });
+    testHistory.forEach(item => {
+      if (item.type === 'reading' || item.type === 'vocabulary') {
+        this.persistQuizResult(ownerIdRaw, item);
+      }
+    });
+    reportHistory.forEach(item => {
+      this.persistLearningReport(ownerIdRaw, item.templateType || 'weekly', item);
+    });
+
+    return {
+      flashcards: flashcards.length,
+      sentenceHistory: sentenceHistory.length,
+      readingHistory: readingHistory.length,
+      testHistory: testHistory.length,
+      reportHistory: reportHistory.length,
+    };
   }
 }
 

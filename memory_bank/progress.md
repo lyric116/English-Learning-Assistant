@@ -1,5 +1,42 @@
 # Progress Log
 
+## 2026-02-26 (complete/p3-07-reading-quiz-report-backend-replay)
+
+### Completed
+- Completed `P3-07` (阅读/测验/报告迁移到后端并保持页面回显).
+- Backend APIs added:
+  - `GET /api/v1/reading/history`
+  - `GET /api/v1/quiz/history`
+  - `POST /api/v1/quiz/history/sync`
+  - `GET /api/v1/report/history`
+- Repository enhancements:
+  - read methods:
+    - `getReadingHistory`
+    - `getQuizHistory`
+    - `getReportHistory`
+  - write method:
+    - `persistQuizResult` (stores actual quiz result snapshot from client)
+- Frontend hydration (local-empty fallback):
+  - `ReadingPage` hydrates `readingHistory` from backend
+  - `QuizPage` hydrates `testHistory` from backend and syncs new result on finalize
+  - `AchievementsPage` hydrates `reportHistory` from backend
+- Migration adjustment:
+  - added `server/migrations/002_quiz_attempts_add_reading_title.sql`
+  - quiz history now stores reading title in `reading_title` (fixes FK failure caused by writing title into `reading_id`)
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `SQLITE_DB_PATH=/tmp/english-learning-p307-test.db npm run db:migrate` ✅ (`001` + `002` applied)
+- Repository replay validation:
+  - persisted reading/quiz/report records
+  - `getReadingHistory/getQuizHistory/getReportHistory` all returned expected rows (`1/1/1`) with correct key fields ✅
+
+### Notes For Next Developer
+- `P3-07` is complete; reading/quiz/report now have backend replay path and frontend local-empty recovery.
+- Next step is `P3-08` (双写与回填策略实现).
+
 ## 2026-02-25 (complete/p3-06-first-batch-persistence-migration)
 
 ### Completed

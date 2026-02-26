@@ -123,6 +123,7 @@ export function QuizPage() {
   const [phase, setPhase] = useState<Phase>('select');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [qIndex, setQIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
@@ -148,6 +149,27 @@ export function QuizPage() {
       setStoredReading(routeReading);
     }
   }, [routeReading, setStoredReading]);
+
+  useEffect(() => {
+    if (historyHydrated || testHistory.length > 0) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const remote = await api.quiz.history(20) as TestResult[];
+        if (!Array.isArray(remote) || remote.length === 0 || cancelled) return;
+        setTestHistory(prev => (prev.length > 0 ? prev : remote.slice(0, 20)));
+        toast(`已从后端恢复 ${remote.length} 条测验历史`, 'info');
+      } catch {
+        // Keep local-first behavior when backend history is unavailable.
+      } finally {
+        if (!cancelled) setHistoryHydrated(true);
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyHydrated, setTestHistory, testHistory.length, toast]);
 
   useEffect(() => {
     const hasLegacy = wrongQuestionBook.some(item => (
@@ -298,7 +320,7 @@ export function QuizPage() {
         sourceQuestionIndex: index,
       }))
       .filter(item => item.userAnswer !== item.question.correctIndex);
-    setTestHistory(prev => [...prev, {
+    const resultRecord: TestResult = {
       type: testType,
       score: metrics.score,
       date: new Date().toISOString(),
@@ -308,7 +330,11 @@ export function QuizPage() {
       timedMode: activeConfig?.timedMode ?? false,
       timeLimitMinutes: activeConfig?.timeLimitMinutes ?? 15,
       timeSpentSeconds,
-    }].slice(-20));
+    };
+    setTestHistory(prev => [...prev, resultRecord].slice(-20));
+    void api.quiz.syncHistory(resultRecord).catch(() => {
+      // Keep main quiz flow unaffected when history sync fails.
+    });
     if (wrongItems.length > 0) {
       setWrongQuestionBook(prev => {
         const mapped = new Map(prev.map(item => [item.id, normalizeWrongQuestionRecord(item)]));

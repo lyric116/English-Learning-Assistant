@@ -127,6 +127,8 @@ export const api = {
         body: JSON.stringify({ text, ...options }),
       });
     },
+    history: (limit = 20) =>
+      request(`/reading/history?limit=${encodeURIComponent(String(limit))}`),
   },
   quiz: {
     readingQuestions: (reading: string, options?: number | QuizGenerateOptions) => {
@@ -143,6 +145,13 @@ export const api = {
         body: JSON.stringify({ vocabulary, ...payload }),
       });
     },
+    syncHistory: (result: unknown) =>
+      request('/quiz/history/sync', {
+        method: 'POST',
+        body: JSON.stringify(result),
+      }),
+    history: (limit = 20) =>
+      request(`/quiz/history?limit=${encodeURIComponent(String(limit))}`),
   },
   report: {
     generate: (reportType: string, learningData: unknown) =>
@@ -150,6 +159,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ reportType, learningData }),
       }),
+    history: (limit = 20) =>
+      request(`/report/history?limit=${encodeURIComponent(String(limit))}`),
   },
   health: () => request<{ status: string }>('/health'),
   ai: {

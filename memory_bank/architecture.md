@@ -1,5 +1,51 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Second-Batch Persistence Replay (`P3-07`)
+
+### `server/src/repositories/learning-data-repository.ts`
+- Added second-batch read/write capabilities:
+  - read:
+    - `getReadingHistory`
+    - `getQuizHistory`
+    - `getReportHistory`
+  - write:
+    - `persistQuizResult` (client-side finalized quiz result sync)
+- Quiz persistence now uses `reading_title` instead of overloading FK field `reading_id`.
+
+### `server/src/routes/reading.ts`
+- Added `GET /history` for reading history replay.
+
+### `server/src/routes/quiz.ts`
+- Added `GET /history` for quiz history replay.
+- Added `POST /history/sync` for finalized quiz result ingestion from frontend.
+
+### `server/src/routes/report.ts`
+- Added `GET /history` for learning report replay.
+
+### `server/migrations/002_quiz_attempts_add_reading_title.sql`
+- Adds `reading_title` column to `quiz_attempts`.
+- Fixes foreign-key violation that occurred when reading title was written into `reading_id`.
+
+### `client/src/lib/api.ts`
+- Added API methods:
+  - `api.reading.history`
+  - `api.quiz.history`
+  - `api.quiz.syncHistory`
+  - `api.report.history`
+
+### `client/src/pages/ReadingPage.tsx`
+- Added local-empty hydration path from backend `reading/history`.
+
+### `client/src/pages/QuizPage.tsx`
+- Added local-empty hydration path from backend `quiz/history`.
+- Added result sync call to backend on quiz finalization.
+
+### `client/src/pages/AchievementsPage.tsx`
+- Added local-empty hydration path from backend `report/history`.
+
+### Architectural Impact
+- Reading/Quiz/Report modules now support backend-backed replay after local storage loss, completing second-batch migration goals for cross-device/session continuity groundwork.
+
 ## Update 2026-02-25: First-Batch Persistence Migration (`P3-06`)
 
 ### `server/src/repositories/learning-data-repository.ts`

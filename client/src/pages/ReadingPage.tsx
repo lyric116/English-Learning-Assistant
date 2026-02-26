@@ -121,9 +121,10 @@ export function ReadingPage() {
   const [length, setLength] = useState<ReadingLength>('medium');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   const [reading, setReading] = useState<ReadingContent | null>(null);
   const [viewMode, setViewMode] = useState<'alternate' | 'parallel'>('alternate');
-  const [, setHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
+  const [readingHistory, setHistory] = useLocalStorage<ReadingContent[]>('readingHistory', []);
   const [, setQuizReadingContext] = useLocalStorage<ReadingContent | null>(quizContextKey, null);
   const [favorites, setFavorites] = useLocalStorage<ReadingFavorite[]>('readingFavorites', []);
   const [showFavorites, setShowFavorites] = useState(false);
@@ -145,6 +146,27 @@ export function ReadingPage() {
     if (!hasLegacy) return;
     setFavorites(prev => prev.map(item => normalizeFavorite(item)));
   }, [favorites, setFavorites]);
+
+  useEffect(() => {
+    if (historyHydrated || readingHistory.length > 0) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const remote = await api.reading.history(20) as ReadingContent[];
+        if (!Array.isArray(remote) || remote.length === 0 || cancelled) return;
+        setHistory(prev => (prev.length > 0 ? prev : remote.slice(0, 20)));
+        toast(`已从后端恢复 ${remote.length} 条阅读历史`, 'info');
+      } catch {
+        // Keep local-first behavior when backend history is unavailable.
+      } finally {
+        if (!cancelled) setHistoryHydrated(true);
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyHydrated, readingHistory.length, setHistory, toast]);
 
   const filteredFavorites = useMemo(() => {
     const keyword = favoriteQuery.trim().toLowerCase();

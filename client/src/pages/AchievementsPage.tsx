@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -330,6 +330,7 @@ export function AchievementsPage() {
   const [selectedType, setSelectedType] = useState<ReportTemplateType>('weekly');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [historyHydrated, setHistoryHydrated] = useState(false);
   const [report, setReport] = useState<LearningReport | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [flashcards] = useLocalStorage<Word[]>('flashcards', []);
@@ -350,6 +351,27 @@ export function AchievementsPage() {
     || readingHistory.length > 0
     || testHistory.length > 0
     || Boolean(flashcardSessionSummary);
+
+  useEffect(() => {
+    if (historyHydrated || reportHistory.length > 0) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const remote = await api.report.history(20) as (LearningReport & { timestamp?: number })[];
+        if (!Array.isArray(remote) || remote.length === 0 || cancelled) return;
+        setReportHistory(prev => (prev.length > 0 ? prev : remote.slice(0, 20)));
+        toast(`已从后端恢复 ${remote.length} 条报告历史`, 'info');
+      } catch {
+        // Keep local-first behavior when backend history is unavailable.
+      } finally {
+        if (!cancelled) setHistoryHydrated(true);
+      }
+    };
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyHydrated, reportHistory.length, setReportHistory, toast]);
 
   const generateReport = async () => {
     if (!hasData) {

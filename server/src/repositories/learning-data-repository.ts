@@ -42,6 +42,32 @@ interface SentenceHistoryRecord {
   timestamp: number;
 }
 
+interface ReadingHistoryRecord {
+  title?: string;
+  english: string;
+  chinese: string;
+  vocabulary: unknown[];
+  timestamp: number;
+  generationConfig?: {
+    language: 'en' | 'zh';
+    topic: string;
+    difficulty: string;
+    length: string;
+  };
+}
+
+interface QuizHistoryRecord {
+  type: 'reading' | 'vocabulary';
+  score: number;
+  date: string;
+  readingTitle: string;
+  questionCount?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  timedMode?: boolean;
+  timeLimitMinutes?: number;
+  timeSpentSeconds?: number;
+}
+
 function normalizeOwnerId(rawOwnerId: string | undefined): string {
   const trimmed = (rawOwnerId || '').trim();
   return trimmed || 'anonymous-default';
@@ -179,6 +205,137 @@ class LearningDataRepository {
     });
   }
 
+  getReadingHistory(ownerIdRaw: string | undefined, limit = 20): ReadingHistoryRecord[] {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
+    const query = `
+      SELECT
+        title,
+        english_text AS english,
+        chinese_text AS chinese,
+        vocabulary_json AS vocabularyJson,
+        language,
+        topic,
+        difficulty,
+        length,
+        CAST(COALESCE(strftime('%s', created_at), strftime('%s', 'now')) AS INTEGER) * 1000 AS timestamp
+      FROM reading_contents
+      WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+        AND owner_id = ${SqliteClient.sqlLiteral(ownerId)}
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit};
+    `;
+    const rows = this.query<{
+      title?: string;
+      english: string;
+      chinese: string;
+      vocabularyJson: string;
+      language: 'en' | 'zh';
+      topic: string;
+      difficulty: string;
+      length: string;
+      timestamp: number;
+    }>('reading', 'select_history', query);
+
+    return rows.map(item => {
+      let vocabulary: unknown[] = [];
+      try {
+        const parsed = JSON.parse(item.vocabularyJson || '[]');
+        vocabulary = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        vocabulary = [];
+      }
+      return {
+        title: item.title || undefined,
+        english: item.english,
+        chinese: item.chinese,
+        vocabulary,
+        timestamp: item.timestamp,
+        generationConfig: {
+          language: item.language,
+          topic: item.topic,
+          difficulty: item.difficulty,
+          length: item.length,
+        },
+      };
+    });
+  }
+
+  getQuizHistory(ownerIdRaw: string | undefined, limit = 20): QuizHistoryRecord[] {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
+    const query = `
+      SELECT
+        quiz_type AS type,
+        CAST(COALESCE(score, 0) AS REAL) AS score,
+        datetime(created_at) AS date,
+        COALESCE(reading_title, '') AS readingTitle,
+        question_count AS questionCount,
+        difficulty,
+        CAST(COALESCE(timed_mode, 0) AS INTEGER) AS timedMode,
+        time_limit_minutes AS timeLimitMinutes,
+        time_spent_seconds AS timeSpentSeconds
+      FROM quiz_attempts
+      WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+        AND owner_id = ${SqliteClient.sqlLiteral(ownerId)}
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit};
+    `;
+    const rows = this.query<{
+      type: 'reading' | 'vocabulary';
+      score: number;
+      date: string;
+      readingTitle: string;
+      questionCount: number;
+      difficulty?: 'easy' | 'medium' | 'hard';
+      timedMode: number;
+      timeLimitMinutes?: number;
+      timeSpentSeconds?: number;
+    }>('quiz', 'select_history', query);
+
+    return rows.map(item => ({
+      type: item.type,
+      score: Math.round(item.score),
+      date: item.date,
+      readingTitle: item.readingTitle || '未知阅读',
+      questionCount: item.questionCount,
+      difficulty: item.difficulty,
+      timedMode: item.timedMode === 1,
+      timeLimitMinutes: item.timeLimitMinutes,
+      timeSpentSeconds: item.timeSpentSeconds,
+    }));
+  }
+
+  getReportHistory(ownerIdRaw: string | undefined, limit = 20): Array<LearningReportPayload & { timestamp?: number }> {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
+    const query = `
+      SELECT
+        report_json AS reportJson,
+        CAST(COALESCE(strftime('%s', created_at), strftime('%s', 'now')) AS INTEGER) * 1000 AS timestamp
+      FROM learning_reports
+      WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
+        AND owner_id = ${SqliteClient.sqlLiteral(ownerId)}
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit};
+    `;
+    const rows = this.query<{ reportJson: string; timestamp: number }>('achievements', 'select_history', query);
+
+    return rows.map(item => {
+      let parsed: LearningReportPayload = {};
+      try {
+        const json = JSON.parse(item.reportJson || '{}');
+        parsed = (json && typeof json === 'object') ? json as LearningReportPayload : {};
+      } catch {
+        parsed = {};
+      }
+      return { ...parsed, timestamp: item.timestamp };
+    });
+  }
+
   persistFlashcards(ownerIdRaw: string | undefined, words: FlashcardRecord[]): void {
     if (!Array.isArray(words) || words.length === 0) return;
 
@@ -290,7 +447,7 @@ class LearningDataRepository {
     const script = `
       INSERT INTO quiz_attempts (
         id, owner_type, owner_id, quiz_type, difficulty, question_count, timed_mode,
-        time_limit_minutes, time_spent_seconds, score, accuracy, reading_id, created_at
+        time_limit_minutes, time_spent_seconds, score, accuracy, reading_id, reading_title, created_at
       ) VALUES (
         ${SqliteClient.sqlLiteral(randomUUID())},
         ${SqliteClient.sqlLiteral(ownerType)},
@@ -304,11 +461,39 @@ class LearningDataRepository {
         0,
         0,
         NULL,
+        ${SqliteClient.sqlLiteral('')},
         datetime('now')
       );
     `;
 
     this.execute('quiz', 'insert_generation_snapshot', script);
+  }
+
+  persistQuizResult(ownerIdRaw: string | undefined, payload: QuizHistoryRecord): void {
+    const ownerId = normalizeOwnerId(ownerIdRaw);
+    const ownerType = 'anonymous';
+    const script = `
+      INSERT INTO quiz_attempts (
+        id, owner_type, owner_id, quiz_type, difficulty, question_count, timed_mode,
+        time_limit_minutes, time_spent_seconds, score, accuracy, reading_id, reading_title, created_at
+      ) VALUES (
+        ${SqliteClient.sqlLiteral(randomUUID())},
+        ${SqliteClient.sqlLiteral(ownerType)},
+        ${SqliteClient.sqlLiteral(ownerId)},
+        ${SqliteClient.sqlLiteral(payload.type)},
+        ${SqliteClient.sqlLiteral(payload.difficulty || 'medium')},
+        ${SqliteClient.sqlLiteral(payload.questionCount || 0)},
+        ${SqliteClient.sqlLiteral(Boolean(payload.timedMode))},
+        ${SqliteClient.sqlLiteral(payload.timeLimitMinutes ?? null)},
+        ${SqliteClient.sqlLiteral(payload.timeSpentSeconds ?? null)},
+        ${SqliteClient.sqlLiteral(payload.score)},
+        ${SqliteClient.sqlLiteral(payload.score)},
+        NULL,
+        ${SqliteClient.sqlLiteral(payload.readingTitle || '')},
+        ${SqliteClient.sqlLiteral(payload.date || new Date().toISOString())}
+      );
+    `;
+    this.execute('quiz', 'insert_result', script);
   }
 
   persistLearningReport(ownerIdRaw: string | undefined, templateType: string, report: LearningReportPayload): void {

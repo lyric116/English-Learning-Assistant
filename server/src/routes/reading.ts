@@ -5,6 +5,12 @@ import { learningDataRepository } from '../repositories/learning-data-repository
 
 export const readingRouter = Router();
 
+function parseLimit(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return fallback;
+  return Math.max(1, Math.min(parsed, 200));
+}
+
 readingRouter.post('/generate', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
@@ -30,6 +36,16 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
       chinese: result.chinese,
       vocabulary: result.vocabulary,
     });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+readingRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseLimit(req.query.limit, 20);
+    const result = learningDataRepository.getReadingHistory(req.header('x-anonymous-session-id') || undefined, limit);
     res.json(result);
   } catch (err) {
     next(err);

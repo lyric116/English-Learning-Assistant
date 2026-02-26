@@ -1,5 +1,32 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Backend Test Baseline (`P4-05`)
+
+### `server/package.json`
+- Added backend test command:
+  - `npm run test` -> `node --experimental-strip-types --experimental-specifier-resolution=node --test tests/**/*.test.ts`
+
+### `server/tests/request-validator.test.ts`
+- Role: route-entry validation branch tests.
+- Covers:
+  - valid reading-generate payload defaulting behavior
+  - invalid reading payload type branch
+  - invalid question-count range branch
+  - missing `aiConfig` branch for AI test endpoint payload
+
+### `server/tests/json-parser.test.ts`
+- Role: AI response JSON parsing risk tests.
+- Covers:
+  - markdown code-block JSON parse
+  - noisy text boundary extraction parse
+  - invalid JSON failure path assertion
+
+### `code/p4_backend_test_baseline.md`
+- Role: `P4-05` closure checklist and validation evidence for backend test baseline.
+
+### Architectural Impact
+- Backend now has a dependency-light automated test entry that catches request validation regressions and AI JSON parsing failures before runtime, creating a practical foundation for later route/service expansion and CI gating.
+
 ## Update 2026-02-26: E2E Key Flow Simulation (`P4-04`)
 
 ### `server/scripts/e2e-main-flow-sim.js`

@@ -1,5 +1,35 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-05-backend-test-baseline)
+
+### Completed
+- Completed `P4-05` (后端自动化测试基础).
+- Added backend test command:
+  - `cd server && npm run test`
+  - uses Node 22 native `node:test` + `--experimental-strip-types` (no extra dependency install).
+- Added first backend test set:
+  - `server/tests/request-validator.test.ts`:
+    - route-entry validator success/default branch
+    - invalid branches for reading/question-count/ai-test payloads
+  - `server/tests/json-parser.test.ts`:
+    - markdown JSON parsing
+    - noisy-text JSON extraction
+    - invalid JSON failure assertion
+- Added baseline artifact:
+  - `code/p4_backend_test_baseline.md`
+
+### Validation Performed
+- `cd server && npm run test` ✅
+- `cd server && npm run build` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P4-05` is complete with executable backend test baseline covering route-entry validation and AI JSON parse risk.
+- Next step is `P4-06` (结构化日志与链路追踪: trace id + request/model timing + error context).
+
 ## 2026-02-26 (complete/p4-04-e2e-key-flow-simulation)
 
 ### Completed

@@ -1,5 +1,25 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Architecture-Phase Integration Regression (`P3-09`)
+
+### `code/p3_architecture_integration_regression.md`
+- Role: Phase-3 integration regression record.
+- Captures:
+  - reading/quiz/report persistence chain verification
+  - cross-owner isolation checks
+  - local-empty replay behavior checks
+  - migration backfill/status verification
+  - build/lint gate evidence
+
+### Regression Evidence Summary
+- owner-scoped repository verification confirms:
+  - same owner replay continuity
+  - different owner isolation
+  - backfill count alignment with payload
+
+### Architectural Impact
+- Phase 3 migration stack now has closure-level regression artifact, reducing handoff ambiguity before entering P4 reliability/observability standardization.
+
 ## Update 2026-02-26: Dual-Write Backfill Strategy (`P3-08`)
 
 ### `server/src/routes/migration.ts`

@@ -57,7 +57,7 @@
 | 51 | P3-06 | completed | First-batch persistence migration landed for Flashcards + Sentence history: backend history read APIs + frontend empty-local fallback hydration from server. |
 | 52 | P3-07 | completed | Migrated reading/quiz/report history to backend replay path: added history APIs, quiz result sync endpoint, and frontend empty-local hydration for three modules. |
 | 53 | P3-08 | completed | Implemented dual-write transition backfill path: migration status/backfill APIs plus client one-time local->server backfill bootstrap. |
-| 54 | P3-09 | pending | Not started. |
+| 54 | P3-09 | completed | Architecture-phase integration regression checklist executed (`code/p3_architecture_integration_regression.md`) with build/lint gates and cross-owner replay/backfill verification. |
 | 55 | P4-01 | completed (out-of-order) | Centralized request validation landed on 2026-02-25. |
 | 56 | P4-02 | pending | Not started. |
 | 57 | P4-03 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P3-09`.
+- First not-yet-completed step: `P4-02`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

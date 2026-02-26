@@ -1,5 +1,31 @@
 # Progress Log
 
+## 2026-02-26 (complete/p3-09-architecture-integration-regression)
+
+### Completed
+- Completed `P3-09` (架构阶段集成回归).
+- Added regression artifact:
+  - `code/p3_architecture_integration_regression.md`
+- Regression scope covers:
+  - 阅读 -> 测验 -> 成就后端持久化链路
+  - 跨会话隔离（不同 `owner_id`）
+  - 同会话恢复（local-empty -> backend replay）
+  - 回填机制（`migration/backfill` + `migration/status`）
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `SQLITE_DB_PATH=/tmp/english-learning-p309-test.db npm run db:migrate` ✅
+- 仓储集成验证 ✅
+  - ownerA: reading/quiz/report 均可读回（`1/1/1`）
+  - ownerB: 初始不可见（`0/0/0`）
+  - ownerB backfill 后状态计数与输入一致
+
+### Notes For Next Developer
+- `P3-09` is complete; Phase 3 (`P3-01` ~ `P3-09`) is now fully closed.
+- Next step is `P4-02` (统一响应结构与错误码规范).
+
 ## 2026-02-26 (complete/p3-08-dual-write-backfill)
 
 ### Completed

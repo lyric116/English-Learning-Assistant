@@ -1,5 +1,32 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Preprod UAT & Rollback Drill (`P5-03`)
+
+### `server/scripts/rollback-drill.js`
+- Role: executable SQLite rollback rehearsal.
+- Flow:
+  - run migrations
+  - write stable marker row
+  - backup DB file
+  - apply mutation row
+  - restore backup
+  - assert expected post-restore state
+- Provides measurable runtime output (`ROLLBACK_DRILL_OK ... durationMs=...`).
+
+### `server/package.json`
+- Added command:
+  - `npm run drill:rollback`
+
+### `code/p5_preprod_uat_and_rollback.md`
+- Role: UAT scope + rollback drill evidence artifact.
+- Captures:
+  - module-level UAT checklist
+  - automated quality-gate pass rate
+  - rollback drill result and limitations
+
+### Architectural Impact
+- Project now has a repeatable rollback rehearsal entry and explicit pre-release UAT record format, reducing deployment-risk ambiguity before production release phase.
+
 ## Update 2026-02-26: Share Landing & Growth Tracking (`P5-02`)
 
 ### `server/migrations/003_create_report_shares.sql`

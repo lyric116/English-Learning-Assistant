@@ -67,9 +67,9 @@
 | 61 | P4-07 | completed | Added CI gate workflow (`.github/workflows/ci.yml`) covering server/client lint-build-test and key-flow regression, plus release checklist `code/release_preflight_checklist.md`. |
 | 62 | P5-01 | completed | Implemented AI provider strategy (whitelist-compatible fallback providers + per-provider daily quota + failover attempts), with env template and doc `code/p5_ai_provider_strategy.md`. |
 | 63 | P5-02 | completed | Added share landing flow and growth tracking: `report_shares` migration + share APIs + `/share/:shareId` page + visit/convert events (`code/p5_share_growth_baseline.md`). |
-| 64 | P5-03 | pending | Not started. |
+| 64 | P5-03 | completed | Added preprod UAT + rollback drill baseline (`server/scripts/rollback-drill.js`, `npm run drill:rollback`) and execution record (`code/p5_preprod_uat_and_rollback.md`). |
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P5-03`.
+- First not-yet-completed step: `P5-04`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

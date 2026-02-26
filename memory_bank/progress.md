@@ -1,5 +1,30 @@
 # Progress Log
 
+## 2026-02-26 (complete/p5-03-preprod-uat-rollback-drill)
+
+### Completed
+- Completed `P5-03` (预发 UAT 与回滚演练).
+- Added rollback drill automation:
+  - `server/scripts/rollback-drill.js`
+  - `cd server && npm run drill:rollback`
+  - drill validates: backup -> mutate -> restore -> data-state assertions.
+- Added UAT + rollback record:
+  - `code/p5_preprod_uat_and_rollback.md`
+  - includes module-level UAT scope and command-gate pass rate.
+
+### Validation Performed
+- `cd server && npm run drill:rollback` ✅ (`ROLLBACK_DRILL_OK`, duration 232ms)
+- `cd server && npm run build` ✅
+- `cd server && npm run test` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P5-03` is complete with executable rollback rehearsal and documented UAT baseline.
+- Next step is `P5-04` (生产发布与 14 天观察期机制).
+
 ## 2026-02-26 (complete/p5-02-share-landing-growth-tracking)
 
 ### Completed

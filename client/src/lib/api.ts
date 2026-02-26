@@ -82,12 +82,25 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
       signal: controller.signal,
     });
 
+    const payload = await res.json().catch(() => null) as (
+      | { success?: boolean; code?: string; message?: string; data?: unknown; error?: string }
+      | null
+    );
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || '请求失败');
+      if (payload && typeof payload === 'object') {
+        const message = payload.message || payload.error || '请求失败';
+        const code = payload.code ? `[${payload.code}] ` : '';
+        throw new Error(`${code}${message}`);
+      }
+      throw new Error(res.statusText || '请求失败');
     }
 
-    return res.json();
+    if (payload && typeof payload === 'object' && payload.success === true && 'data' in payload) {
+      return payload.data as T;
+    }
+
+    return payload as T;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(`请求超时（>${REQUEST_TIMEOUT_MS / 1000}s），请稍后重试`);

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { analyzeSentence } from '../services/ai-service';
 import { validateSentenceAnalyzePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const sentenceRouter = Router();
 
@@ -170,7 +171,7 @@ sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFu
       sentence,
       normalizedResult,
     );
-    res.json(normalizedResult);
+    sendSuccess(res, normalizedResult);
   } catch (err) {
     next(err);
   }
@@ -180,7 +181,7 @@ sentenceRouter.get('/history', (req: Request, res: Response, next: NextFunction)
   try {
     const limit = parseLimit(req.query.limit, 20);
     const result = learningDataRepository.getSentenceHistory(req.header('x-anonymous-session-id') || undefined, limit);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

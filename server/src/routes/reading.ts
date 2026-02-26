@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { generateReadingContent } from '../services/ai-service';
 import { validateReadingGeneratePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const readingRouter = Router();
 
@@ -36,7 +37,7 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
       chinese: result.chinese,
       vocabulary: result.vocabulary,
     });
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -46,7 +47,7 @@ readingRouter.get('/history', (req: Request, res: Response, next: NextFunction) 
   try {
     const limit = parseLimit(req.query.limit, 20);
     const result = learningDataRepository.getReadingHistory(req.header('x-anonymous-session-id') || undefined, limit);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

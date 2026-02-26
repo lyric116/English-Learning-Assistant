@@ -11,6 +11,7 @@ import { reportRouter } from './routes/report';
 import { migrationRouter } from './routes/migration';
 import { testConnection } from './services/ai-service';
 import { validateAiTestPayload } from './utils/request-validator';
+import { sendError, sendSuccess } from './utils/response';
 
 const app = express();
 
@@ -20,12 +21,12 @@ app.use('/api/v1', rateLimiter);
 
 // Health check
 app.get('/api/v1/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  sendSuccess(res, { status: 'ok' });
 });
 
 // API base route
 app.get('/api/v1', (_req, res) => {
-  res.json({
+  sendSuccess(res, {
     service: 'english-learning-api',
     status: 'ok',
     version: 'v1',
@@ -49,7 +50,7 @@ app.post('/api/v1/ai/test', async (req, res, next) => {
   try {
     const { aiConfig } = validateAiTestPayload(req.body);
     const result = await testConnection(aiConfig);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -63,7 +64,7 @@ app.use('/api/v1/quiz', quizRouter);
 app.use('/api/v1/report', reportRouter);
 app.use('/api/v1/migration', migrationRouter);
 app.use('/api/v1', (_req, res) => {
-  res.status(404).json({ error: 'API 路由不存在' });
+  sendError(res, 404, 'NOT_FOUND', 'API 路由不存在');
 });
 
 app.use(errorHandler);

@@ -1,5 +1,39 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Response Envelope & Error Codes (`P4-02`)
+
+### `server/src/utils/response.ts`
+- Added centralized response helpers:
+  - `sendSuccess`
+  - `sendError`
+- Establishes stable response envelope format for all API endpoints.
+
+### `server/src/middleware/error-handler.ts`
+- Error output now standardized with explicit error codes.
+- Added status/code mapping to reduce free-form error handling drift.
+
+### `server/src/middleware/rate-limiter.ts`
+- Rate-limit response now conforms to unified error envelope (`RATE_LIMITED`).
+
+### Route Layer Unification
+- Updated all route handlers and root endpoints to use response helpers:
+  - `server/src/index.ts`
+  - `server/src/routes/flashcards.ts`
+  - `server/src/routes/sentence.ts`
+  - `server/src/routes/reading.ts`
+  - `server/src/routes/quiz.ts`
+  - `server/src/routes/report.ts`
+  - `server/src/routes/migration.ts`
+
+### `client/src/lib/api.ts`
+- Request client now:
+  - auto-unwraps standardized success payload `data`
+  - reads standardized `code/message` from non-2xx responses
+  - keeps fallback compatibility for legacy raw payloads
+
+### Architectural Impact
+- Frontend and backend now share a single response/error contract, improving observability, consistency, and future automated-test assertions.
+
 ## Update 2026-02-26: Architecture-Phase Integration Regression (`P3-09`)
 
 ### `code/p3_architecture_integration_regression.md`

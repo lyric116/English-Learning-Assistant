@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { generateReadingQuestions, generateVocabularyQuestions } from '../services/ai-service';
 import { validateReadingQuestionsPayload, validateVocabularyQuestionsPayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const quizRouter = Router();
 
@@ -33,7 +34,7 @@ quizRouter.post('/reading-questions', async (req: Request, res: Response, next: 
       timedMode,
       timeLimitMinutes,
     });
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -67,7 +68,7 @@ quizRouter.post('/history/sync', (req: Request, res: Response, next: NextFunctio
       timeLimitMinutes,
       timeSpentSeconds,
     });
-    res.json({ ok: true });
+    sendSuccess(res, { ok: true });
   } catch (err) {
     next(err);
   }
@@ -77,7 +78,7 @@ quizRouter.get('/history', (req: Request, res: Response, next: NextFunction) => 
   try {
     const limit = parseLimit(req.query.limit, 20);
     const result = learningDataRepository.getQuizHistory(req.header('x-anonymous-session-id') || undefined, limit);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -105,7 +106,7 @@ quizRouter.post('/vocabulary-questions', async (req: Request, res: Response, nex
       timedMode,
       timeLimitMinutes,
     });
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

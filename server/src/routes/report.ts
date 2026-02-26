@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { generateLearningReport } from '../services/ai-service';
 import { validateReportGeneratePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const reportRouter = Router();
 
@@ -20,7 +21,7 @@ reportRouter.post('/generate', async (req: Request, res: Response, next: NextFun
       reportType,
       result as Record<string, unknown>,
     );
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -30,7 +31,7 @@ reportRouter.get('/history', (req: Request, res: Response, next: NextFunction) =
   try {
     const limit = parseLimit(req.query.limit, 20);
     const result = learningDataRepository.getReportHistory(req.header('x-anonymous-session-id') || undefined, limit);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

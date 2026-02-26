@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { extractWords } from '../services/ai-service';
 import { validateFlashcardsExtractPayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const flashcardsRouter = Router();
 
@@ -50,7 +51,7 @@ flashcardsRouter.post('/extract', async (req: Request, res: Response, next: Next
     const result = await extractWords(text, maxWords, level, aiConfig);
     const normalizedResult = normalizeExtractedWords(result, maxWords);
     learningDataRepository.persistFlashcards(req.header('x-anonymous-session-id') || undefined, normalizedResult);
-    res.json(normalizedResult);
+    sendSuccess(res, normalizedResult);
   } catch (err) {
     next(err);
   }
@@ -60,7 +61,7 @@ flashcardsRouter.get('/history', (req: Request, res: Response, next: NextFunctio
   try {
     const limit = parseLimit(req.query.limit, 120);
     const result = learningDataRepository.getFlashcards(req.header('x-anonymous-session-id') || undefined, limit);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

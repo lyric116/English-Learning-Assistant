@@ -1,12 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { learningDataRepository } from '../repositories/learning-data-repository';
+import { sendSuccess } from '../utils/response';
 
 export const migrationRouter = Router();
 
 migrationRouter.get('/status', (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = learningDataRepository.getBackfillStatus(req.header('x-anonymous-session-id') || undefined);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
@@ -25,7 +26,7 @@ migrationRouter.post('/backfill', (req: Request, res: Response, next: NextFuncti
         reportHistory: Array.isArray(payload.reportHistory) ? payload.reportHistory as never[] : [],
       },
     );
-    res.json({ ok: true, synced: result });
+    sendSuccess(res, { ok: true, synced: result });
   } catch (err) {
     next(err);
   }

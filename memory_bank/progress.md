@@ -1,5 +1,40 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-02-response-envelope-error-codes)
+
+### Completed
+- Completed `P4-02` (统一响应结构与错误码).
+- Server-side unification:
+  - added response utility: `server/src/utils/response.ts`
+  - all API success responses now use unified envelope:
+    - `success`
+    - `code`
+    - `message`
+    - `data`
+    - `timestamp`
+  - error pipeline now emits standardized code/message:
+    - `VALIDATION_ERROR`
+    - `BAD_REQUEST`
+    - `RATE_LIMITED`
+    - `UPSTREAM_TIMEOUT`
+    - `UPSTREAM_FAILURE`
+    - `INTERNAL_ERROR`
+    - etc.
+  - rate limiter response aligned to same error envelope
+- Client-side mapping:
+  - `client/src/lib/api.ts` now auto-unwraps server `data`
+  - non-2xx now prefers `code + message` for user-visible errors
+  - preserves compatibility for legacy plain JSON payloads
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+
+### Notes For Next Developer
+- `P4-02` is complete; server/client now share one response/error contract baseline.
+- Next step is `P4-03` (前端自动化测试基础：API client + hooks).
+
 ## 2026-02-26 (complete/p3-09-architecture-integration-regression)
 
 ### Completed

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../utils/request-validator';
+import { sendError } from '../utils/response';
 
 function redactSensitive(text: string): string {
   const sanitized = text
@@ -19,20 +20,34 @@ function inferStatus(message: string): number {
   return 500;
 }
 
+function inferErrorCode(status: number, message: string): string {
+  if (status === 400) return 'BAD_REQUEST';
+  if (status === 401) return 'UNAUTHORIZED';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 404) return 'NOT_FOUND';
+  if (status === 429) return 'RATE_LIMITED';
+  if (status === 504) return 'UPSTREAM_TIMEOUT';
+  if (status === 502) return 'UPSTREAM_FAILURE';
+  if (status >= 500) return 'INTERNAL_ERROR';
+  if (message.includes('JSON')) return 'INVALID_JSON';
+  return 'UNKNOWN_ERROR';
+}
+
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   const sanitizedMessage = redactSensitive(err.message || '未知错误');
   if (err instanceof ValidationError) {
-    res.status(400).json({ error: sanitizedMessage });
+    sendError(res, 400, 'VALIDATION_ERROR', sanitizedMessage);
     return;
   }
 
   const status = inferStatus(sanitizedMessage);
+  const code = inferErrorCode(status, sanitizedMessage);
   console.error('[Error]', sanitizedMessage);
 
   if (status === 500) {
-    res.status(500).json({ error: '服务器内部错误，请稍后重试' });
+    sendError(res, 500, code, '服务器内部错误，请稍后重试');
     return;
   }
 
-  res.status(status).json({ error: sanitizedMessage });
+  sendError(res, status, code, sanitizedMessage);
 }

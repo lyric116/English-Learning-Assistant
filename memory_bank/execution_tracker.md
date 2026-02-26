@@ -59,7 +59,7 @@
 | 53 | P3-08 | completed | Implemented dual-write transition backfill path: migration status/backfill APIs plus client one-time local->server backfill bootstrap. |
 | 54 | P3-09 | completed | Architecture-phase integration regression checklist executed (`code/p3_architecture_integration_regression.md`) with build/lint gates and cross-owner replay/backfill verification. |
 | 55 | P4-01 | completed (out-of-order) | Centralized request validation landed on 2026-02-25. |
-| 56 | P4-02 | pending | Not started. |
+| 56 | P4-02 | completed | Unified API response envelope + error-code mapping across server routes/middleware, with client-side response unwrapping and code-aware error messages. |
 | 57 | P4-03 | pending | Not started. |
 | 58 | P4-04 | pending | Not started. |
 | 59 | P4-05 | pending | Not started. |
@@ -71,5 +71,5 @@
 | 65 | P5-04 | pending | Not started. |
 
 ## Current Execution Pointer
-- First not-yet-completed step: `P4-02`.
+- First not-yet-completed step: `P4-03`.
 - Execution policy: continue from the first pending/partial step unless explicitly reprioritized by lyricx.

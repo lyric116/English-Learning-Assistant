@@ -1,5 +1,42 @@
 # Progress Log
 
+## 2026-02-26 (complete/p4-06-structured-logging-tracing)
+
+### Completed
+- Completed `P4-06` (结构化日志与链路追踪).
+- Added request-level tracing and context propagation:
+  - `server/src/middleware/request-tracing.ts`
+  - `server/src/utils/request-context.ts`
+  - behavior:
+    - accepts incoming `x-trace-id` or generates one
+    - returns `x-trace-id` in response header
+    - logs request completion with `method/path/statusCode/durationMs`
+- Upgraded logger:
+  - `server/src/utils/logger.ts` now auto-attaches context `traceId`.
+- Upgraded error telemetry:
+  - `server/src/middleware/error-handler.ts`
+  - structured logs: `http.request.validation_failed`, `http.request.failed`
+- Added AI call telemetry in service layer:
+  - `server/src/services/ai-service.ts`
+  - logs:
+    - `ai.request.completed` / `ai.request.failed`
+    - `ai.connection.completed` / `ai.connection.failed`
+  - fields include `providerHost/model/statusCode/durationMs/error`.
+- Added closure artifact:
+  - `code/p4_observability_baseline.md`
+
+### Validation Performed
+- `cd server && npm run build` ✅
+- `cd server && npm run test` ✅
+- `cd server && npm run test:e2e-flow` ✅
+- `cd client && npm run lint` ✅
+- `cd client && npm run build` ✅
+- `cd client && npm run test` ✅
+
+### Notes For Next Developer
+- `P4-06` is complete; backend now has request trace id propagation and structured observability for request + AI call chain.
+- Next step is `P4-07` (CI 门禁与发布检查清单).
+
 ## 2026-02-26 (complete/p4-05-backend-test-baseline)
 
 ### Completed

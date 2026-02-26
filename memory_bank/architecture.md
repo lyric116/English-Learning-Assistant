@@ -1,5 +1,40 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Structured Logging & Trace (`P4-06`)
+
+### `server/src/middleware/request-tracing.ts`
+- Role: request-level tracing middleware.
+- Behavior:
+  - reads inbound `x-trace-id` or generates UUID
+  - writes `x-trace-id` to response headers
+  - logs `http.request.complete` with method/path/status/duration
+
+### `server/src/utils/request-context.ts`
+- Role: request context propagation.
+- Uses `AsyncLocalStorage` to carry `traceId` across async call chain.
+
+### `server/src/utils/logger.ts`
+- Enhanced to auto-attach `traceId` from request context when available.
+- Keeps existing JSON structured output shape.
+
+### `server/src/middleware/error-handler.ts`
+- Now emits structured error logs instead of plain `console.error`:
+  - `http.request.validation_failed`
+  - `http.request.failed`
+- Logs include method/path/status/code/error context for quicker triage.
+
+### `server/src/services/ai-service.ts`
+- Added AI telemetry logs around upstream calls:
+  - `ai.request.completed` / `ai.request.failed`
+  - `ai.connection.completed` / `ai.connection.failed`
+- Logs include `providerHost`, `model`, `statusCode`, `durationMs`, and sanitized error details.
+
+### `code/p4_observability_baseline.md`
+- Role: `P4-06` closure checklist and trace/log contract summary.
+
+### Architectural Impact
+- Backend now supports end-to-end request observability: a single `traceId` can link HTTP request lifecycle, AI upstream timing, and structured error context across all module routes.
+
 ## Update 2026-02-26: Backend Test Baseline (`P4-05`)
 
 ### `server/package.json`

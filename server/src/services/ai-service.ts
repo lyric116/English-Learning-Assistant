@@ -8,6 +8,7 @@ import {
   buildLearningReportPrompt,
 } from '../utils/prompt-builder';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
 interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
@@ -137,6 +138,14 @@ function buildCompletionsEndpoint(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
 }
 
+function readHost(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return 'unknown';
+  }
+}
+
 function validateAIConfig(aiConfig?: AIConfig): asserts aiConfig is AIConfig {
   if (!aiConfig) {
     throw new Error('请先在页面设置中配置 AI 服务（API Key、Base URL、Model）');
@@ -232,12 +241,34 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
 
 async function sendRequest(prompt: string, options: { temperature?: number; maxTokens?: number } = {}, aiConfig?: AIConfig): Promise<string> {
   validateAIConfig(aiConfig);
+  const startedAt = Date.now();
+  const providerHost = readHost(aiConfig.baseUrl);
+  let res: Response;
 
-  const res = await postChatCompletions(aiConfig, {
+  try {
+    res = await postChatCompletions(aiConfig, {
       model: aiConfig.model,
       messages: [{ role: 'user', content: prompt }],
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 2000,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    logger.error('ai.request.failed', {
+      providerHost,
+      model: aiConfig.model,
+      durationMs: Date.now() - startedAt,
+      error: sanitizeErrorText(message),
+    });
+    throw error;
+  }
+
+  logger.info('ai.request.completed', {
+    providerHost,
+    model: aiConfig.model,
+    statusCode: res.status,
+    ok: res.ok,
+    durationMs: Date.now() - startedAt,
   });
 
   if (!res.ok) {
@@ -302,11 +333,33 @@ export async function generateLearningReport(reportType: string, learningData: u
 
 export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
   validateAIConfig(aiConfig);
+  const startedAt = Date.now();
+  const providerHost = readHost(aiConfig.baseUrl);
+  let res: Response;
 
-  const res = await postChatCompletions(aiConfig, {
+  try {
+    res = await postChatCompletions(aiConfig, {
       model: aiConfig.model,
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 5,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    logger.error('ai.connection.failed', {
+      providerHost,
+      model: aiConfig.model,
+      durationMs: Date.now() - startedAt,
+      error: sanitizeErrorText(message),
+    });
+    throw error;
+  }
+
+  logger.info('ai.connection.completed', {
+    providerHost,
+    model: aiConfig.model,
+    statusCode: res.status,
+    ok: res.ok,
+    durationMs: Date.now() - startedAt,
   });
 
   if (!res.ok) {

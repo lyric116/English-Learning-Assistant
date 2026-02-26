@@ -1,3 +1,5 @@
+import { getTraceId } from './request-context';
+
 type LogLevel = 'info' | 'warn' | 'error';
 
 interface LogPayload {
@@ -5,10 +7,12 @@ interface LogPayload {
 }
 
 function write(level: LogLevel, message: string, payload: LogPayload = {}): void {
+  const traceId = typeof payload.traceId === 'string' ? payload.traceId : getTraceId();
   const entry = {
     level,
     message,
     timestamp: new Date().toISOString(),
+    ...(traceId ? { traceId } : {}),
     ...payload,
   };
 

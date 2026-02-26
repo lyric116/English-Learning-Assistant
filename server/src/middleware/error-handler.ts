@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../utils/request-validator';
 import { sendError } from '../utils/response';
+import { logger } from '../utils/logger';
 
 function redactSensitive(text: string): string {
   const sanitized = text
@@ -33,16 +34,27 @@ function inferErrorCode(status: number, message: string): string {
   return 'UNKNOWN_ERROR';
 }
 
-export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
   const sanitizedMessage = redactSensitive(err.message || '未知错误');
   if (err instanceof ValidationError) {
+    logger.warn('http.request.validation_failed', {
+      method: req.method,
+      path: req.originalUrl || req.url,
+      error: sanitizedMessage,
+    });
     sendError(res, 400, 'VALIDATION_ERROR', sanitizedMessage);
     return;
   }
 
   const status = inferStatus(sanitizedMessage);
   const code = inferErrorCode(status, sanitizedMessage);
-  console.error('[Error]', sanitizedMessage);
+  logger.error('http.request.failed', {
+    method: req.method,
+    path: req.originalUrl || req.url,
+    statusCode: status,
+    code,
+    error: sanitizedMessage,
+  });
 
   if (status === 500) {
     sendError(res, 500, code, '服务器内部错误，请稍后重试');

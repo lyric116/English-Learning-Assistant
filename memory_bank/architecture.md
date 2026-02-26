@@ -1,5 +1,25 @@
 # Architecture Notes (MVP Core Closure)
 
+## Update 2026-02-26: Observation Top-3 Automation (Post-Plan)
+
+### `server/scripts/ops-top3-summary.js`
+- Role: convert accumulated daily ops reports into a Top-3 iteration backlog artifact.
+- Input:
+  - `code/ops_daily_report_YYYY-MM-DD.md` files
+- Output:
+  - `code/ops_top3_iteration_backlog.md`
+- Output fields include impact, owner, ETA, and action for fast execution planning.
+
+### `server/package.json`
+- Added command:
+  - `npm run ops:top3-summary`
+
+### `code/ops_top3_iteration_backlog.md`
+- First generated backlog artifact proving the day-14-style summary path is executable even during early observation days.
+
+### Architectural Impact
+- Post-release loop is now end-to-end automated from daily metrics generation to prioritized iteration backlog synthesis, reducing manual handoff overhead for product/engineering planning.
+
 ## Update 2026-02-26: Production Observation Window (`P5-04`)
 
 ### `server/scripts/ops-daily-report.js`

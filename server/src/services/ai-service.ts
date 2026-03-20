@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import dns from 'dns';
 import http from 'http';
 import https from 'https';
 import { parseJsonResponse } from '../utils/json-parser';
@@ -78,8 +79,14 @@ interface RequestOptions {
 const providerQuotaState = new Map<string, ProviderQuotaState>();
 const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
 const inflightRequestCache = new Map<string, Promise<string>>();
+const hostAddressState = new Map<string, {
+  addresses: string[];
+  nextIndex: number;
+  lastSuccessfulAddress?: string;
+}>();
 const REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
-const CONNECT_TIMEOUT_MS = 25_000;
+const CONNECT_TIMEOUT_MS = 8_000;
+const CONNECT_RETRY_ATTEMPTS = 3;
 const httpAgent = new http.Agent({
   keepAlive: true,
   maxSockets: 32,
@@ -344,6 +351,57 @@ function describeErrorCause(error: unknown): string | undefined {
   return undefined;
 }
 
+function recordSuccessfulAddress(hostname: string, address: string | undefined): void {
+  if (!address) return;
+
+  const state = hostAddressState.get(hostname);
+  hostAddressState.set(hostname, {
+    addresses: state?.addresses ?? [],
+    nextIndex: state?.nextIndex ?? 0,
+    lastSuccessfulAddress: address,
+  });
+}
+
+function clearPreferredAddress(hostname: string): void {
+  const state = hostAddressState.get(hostname);
+  if (!state) return;
+
+  hostAddressState.set(hostname, {
+    addresses: state.addresses,
+    nextIndex: state.nextIndex,
+    lastSuccessfulAddress: undefined,
+  });
+}
+
+function lookupWithRotation(
+  hostname: string,
+  callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void,
+): void {
+  const state = hostAddressState.get(hostname);
+  if (state?.lastSuccessfulAddress) {
+    callback(null, state.lastSuccessfulAddress, 4);
+    return;
+  }
+
+  dns.lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
+    if (error || !addresses.length) {
+      dns.lookup(hostname, { family: 4 }, callback);
+      return;
+    }
+
+    const selectedIndex = state?.nextIndex ?? 0;
+    const selected = addresses[selectedIndex % addresses.length];
+
+    hostAddressState.set(hostname, {
+      addresses: addresses.map(item => item.address),
+      nextIndex: (selectedIndex + 1) % addresses.length,
+      lastSuccessfulAddress: state?.lastSuccessfulAddress,
+    });
+
+    callback(null, selected.address, selected.family);
+  });
+}
+
 function makeHttpResponse(status: number, statusText: string, body: string): Response {
   return new Response(body, {
     status,
@@ -368,6 +426,9 @@ async function postJsonWithAgent(urlString: string, headers: Record<string, stri
       path: `${url.pathname}${url.search}`,
       method: 'POST',
       agent,
+      lookup: (hostname, _options, callback) => {
+        lookupWithRotation(hostname, callback);
+      },
       headers: {
         ...headers,
         'Content-Length': Buffer.byteLength(body).toString(),
@@ -400,11 +461,14 @@ async function postJsonWithAgent(urlString: string, headers: Record<string, stri
       if (socket.connecting) {
         socket.setTimeout(CONNECT_TIMEOUT_MS);
         socket.once('connect', () => {
+          recordSuccessfulAddress(url.hostname, socket.remoteAddress);
           socket.setTimeout(0);
         });
         socket.once('timeout', () => {
           req.destroy(new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`));
         });
+      } else {
+        recordSuccessfulAddress(url.hostname, socket.remoteAddress);
       }
     });
 
@@ -608,21 +672,40 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
   try {
     const payload = { ...body };
     delete payload.timeoutMs;
-    return await postJsonWithAgent(
-      buildCompletionsEndpoint(aiConfig.baseUrl),
-      {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${aiConfig.apiKey}`,
-      },
-      JSON.stringify(payload),
-      timeoutMs,
-    );
+    const requestUrl = buildCompletionsEndpoint(aiConfig.baseUrl);
+    const requestHost = new URL(requestUrl).hostname;
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= CONNECT_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        return await postJsonWithAgent(
+          requestUrl,
+          {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiConfig.apiKey}`,
+          },
+          JSON.stringify(payload),
+          timeoutMs,
+        );
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.startsWith('connect_timeout:')) {
+          throw error;
+        }
+        lastError = error;
+        clearPreferredAddress(requestHost);
+      }
+    }
+
+    throw lastError ?? new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`);
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('response_timeout:')) {
       throw new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
     }
     if (err instanceof Error && err.message.startsWith('connect_timeout:')) {
-      throw new AIRequestError(`AI 连接超时（>${Math.floor(CONNECT_TIMEOUT_MS / 1000)}s）`, { retryable: true });
+      throw new AIRequestError(
+        `AI 连接超时（单次 >${Math.floor(CONNECT_TIMEOUT_MS / 1000)}s，已重试 ${CONNECT_RETRY_ATTEMPTS} 次）`,
+        { retryable: true },
+      );
     }
     const fallback = err instanceof Error ? err.message : '未知网络错误';
     const cause = describeErrorCause(err);

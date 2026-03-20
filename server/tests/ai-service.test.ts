@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  estimateCompactFlashcardsMaxTokens,
   estimateFlashcardsMaxTokens,
   estimateReadingMaxTokens,
   estimateSentenceMaxTokens,
@@ -18,7 +19,12 @@ test('estimateTextTokens handles mixed English and Chinese input', () => {
 
 test('estimateFlashcardsMaxTokens grows with requested word count and stays capped', () => {
   assert.ok(estimateFlashcardsMaxTokens(5) < estimateFlashcardsMaxTokens(10));
-  assert.equal(estimateFlashcardsMaxTokens(100), 900);
+  assert.equal(estimateFlashcardsMaxTokens(100), 640);
+});
+
+test('estimateCompactFlashcardsMaxTokens stays below standard flashcard budgets', () => {
+  assert.ok(estimateCompactFlashcardsMaxTokens(10) < estimateFlashcardsMaxTokens(10));
+  assert.equal(estimateCompactFlashcardsMaxTokens(100), 460);
 });
 
 test('estimateSentenceMaxTokens stays within tuned sentence-analysis range', () => {

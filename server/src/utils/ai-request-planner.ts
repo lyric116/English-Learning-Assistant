@@ -23,7 +23,11 @@ export function estimateTextTokens(text: string): number {
 }
 
 export function estimateFlashcardsMaxTokens(maxWords: number): number {
-  return clamp(220 + maxWords * 72, 320, 900);
+  return clamp(180 + maxWords * 46, 280, 640);
+}
+
+export function estimateCompactFlashcardsMaxTokens(maxWords: number): number {
+  return clamp(140 + maxWords * 30, 220, 460);
 }
 
 export function estimateSentenceMaxTokens(sentence: string): number {

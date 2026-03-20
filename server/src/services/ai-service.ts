@@ -12,6 +12,7 @@ import {
   buildLearningReportPrompt,
 } from '../utils/prompt-builder';
 import {
+  estimateCompactFlashcardsMaxTokens,
   estimateFlashcardsMaxTokens,
   estimateReadingMaxTokens,
   estimateSentenceMaxTokens,
@@ -83,6 +84,8 @@ interface AgentRequestOptions {
   body?: string;
   timeoutMs: number;
 }
+
+type ModelProfile = 'standard' | 'large_generation' | 'slow_reasoning';
 
 const providerQuotaState = new Map<string, ProviderQuotaState>();
 const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
@@ -269,11 +272,20 @@ function normalizeModelName(modelName: string): string {
   return modelName.trim().toLowerCase();
 }
 
-function isSlowReasoningModel(modelName: string): boolean {
+function parseModelSizeInBillions(modelName: string): number | undefined {
   const normalized = normalizeModelName(modelName);
-  if (!normalized) return false;
+  const match = normalized.match(/(?:^|[^a-z0-9])(\d{2,3})b(?:[^a-z0-9]|$)/);
+  if (!match) return undefined;
 
-  return normalized.includes('reasoner')
+  const size = Number(match[1]);
+  return Number.isFinite(size) ? size : undefined;
+}
+
+function getModelProfile(modelName: string): ModelProfile {
+  const normalized = normalizeModelName(modelName);
+  if (!normalized) return 'standard';
+
+  const slowReasoning = normalized.includes('reasoner')
     || normalized.includes('reasoning')
     || normalized.includes('thinking')
     || normalized.startsWith('gpt-5')
@@ -282,25 +294,36 @@ function isSlowReasoningModel(modelName: string): boolean {
     || normalized === 'o3'
     || normalized.startsWith('o3-')
     || normalized.includes('r1');
+
+  if (slowReasoning) {
+    return 'slow_reasoning';
+  }
+
+  const sizeInBillions = parseModelSizeInBillions(normalized);
+  if (sizeInBillions !== undefined && sizeInBillions >= 24) {
+    return 'large_generation';
+  }
+
+  return 'standard';
 }
 
 function pickTimeoutMs(action: string, modelName: string): number {
-  const slowModel = isSlowReasoningModel(modelName);
+  const modelProfile = getModelProfile(modelName);
 
   switch (action) {
     case 'connection_test':
-      return slowModel ? 40_000 : 15_000;
+      return modelProfile === 'slow_reasoning' ? 40_000 : modelProfile === 'large_generation' ? 25_000 : 15_000;
     case 'extract_words':
-      return slowModel ? 90_000 : 45_000;
+      return modelProfile === 'slow_reasoning' ? 90_000 : modelProfile === 'large_generation' ? 75_000 : 45_000;
     case 'analyze_sentence':
-      return slowModel ? 210_000 : 55_000;
+      return modelProfile === 'slow_reasoning' ? 210_000 : modelProfile === 'large_generation' ? 120_000 : 55_000;
     case 'generate_reading':
-      return slowModel ? 210_000 : 60_000;
+      return modelProfile === 'slow_reasoning' ? 210_000 : modelProfile === 'large_generation' ? 120_000 : 60_000;
     case 'generate_reading_questions':
     case 'generate_vocabulary_questions':
-      return slowModel ? 90_000 : 45_000;
+      return modelProfile === 'slow_reasoning' ? 90_000 : modelProfile === 'large_generation' ? 75_000 : 45_000;
     case 'generate_learning_report':
-      return slowModel ? 120_000 : 60_000;
+      return modelProfile === 'slow_reasoning' ? 120_000 : modelProfile === 'large_generation' ? 75_000 : 60_000;
     default:
       return config.ai.requestTimeoutMs;
   }
@@ -792,7 +815,7 @@ async function sendRequest(prompt: string, options: RequestOptions, aiConfig?: A
 
   return withProviderFallback(aiConfig, options.action, async provider => {
     const providerHost = readHost(provider.baseUrl);
-    const modelProfile = isSlowReasoningModel(provider.model) ? 'slow_reasoning' : 'standard';
+    const modelProfile = getModelProfile(provider.model);
     const cacheKey = buildRequestCacheKey(provider, options.action, prompt, maxTokens);
     const cachedContent = readCachedContent(cacheKey);
     if (cachedContent) {
@@ -911,17 +934,19 @@ async function sendRequest(prompt: string, options: RequestOptions, aiConfig?: A
 }
 
 export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
-  const prompt = buildExtractWordsPrompt(text, maxWords, level);
+  const modelProfile = getModelProfile(aiConfig?.model ?? '');
+  const compactMode = modelProfile !== 'standard';
+  const prompt = buildExtractWordsPrompt(text, maxWords, level, compactMode ? { compact: true } : undefined);
   const content = await sendRequest(prompt, {
     action: 'extract_words',
-    temperature: 0.2,
-    maxTokens: estimateFlashcardsMaxTokens(maxWords),
+    temperature: compactMode ? 0 : 0.2,
+    maxTokens: compactMode ? estimateCompactFlashcardsMaxTokens(maxWords) : estimateFlashcardsMaxTokens(maxWords),
   }, aiConfig);
   return parseJsonResponse(content);
 }
 
 export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
-  const compactMode = isSlowReasoningModel(aiConfig?.model ?? '');
+  const compactMode = getModelProfile(aiConfig?.model ?? '') !== 'standard';
   const prompt = buildAnalyzeSentencePrompt(sentence, compactMode ? { compact: true } : undefined);
   const content = await sendRequest(prompt, {
     action: 'analyze_sentence',

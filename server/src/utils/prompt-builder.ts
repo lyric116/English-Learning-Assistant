@@ -1,6 +1,6 @@
 // Prompt templates — preserved from original ai-service.js
 
-export function buildExtractWordsPrompt(text: string, maxWords: number, level: string): string {
+export function buildExtractWordsPrompt(text: string, maxWords: number, level: string, options?: { compact?: boolean }): string {
   let levelPrompt = '';
   switch (level) {
     case 'cet4':
@@ -14,6 +14,36 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
       break;
     default:
       levelPrompt = '提取真正值得学习的词汇';
+  }
+
+  if (options?.compact) {
+    return `你是英语词汇学习助手。请从文本中筛选最值得学习的 ${maxWords} 个单词或短语，${levelPrompt}。
+
+硬性限制：
+- 宁缺毋滥；如果有效词汇不足，可以少于 ${maxWords} 个
+- 忽略基础词、重复词、纯专有名词
+- 只保留真正影响理解或值得积累的词/短语
+- definition 尽量不超过 14 个字
+- etymology 尽量不超过 10 个字
+- example 尽量不超过 10 个英文词
+- exampleTranslation 尽量不超过 16 个字
+- phonetic 可为空字符串
+- 只返回合法 JSON，不要 Markdown，不要额外解释
+
+返回格式：
+[
+  {
+    "word": "单词",
+    "phonetic": "音标",
+    "definition": "定义",
+    "etymology": "词源",
+    "example": "例句",
+    "exampleTranslation": "例句翻译"
+  }
+]
+
+文本：
+${text}`;
   }
 
   return `你是英语词汇学习助手。请从文本中筛选最值得学习的 ${maxWords} 个单词或短语，${levelPrompt}。

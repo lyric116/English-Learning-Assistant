@@ -567,6 +567,17 @@ function toRequestError(error: unknown): AIRequestError {
   }
 
   if (error instanceof Error) {
+    if (error.message.startsWith('response_timeout:')) {
+      const timeoutMs = Number(error.message.split(':')[1] || '0');
+      return new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
+    }
+    if (error.message.startsWith('connect_timeout:')) {
+      const timeoutMs = Number(error.message.split(':')[1] || '0');
+      return new AIRequestError(`AI 连接超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
+    }
+    if (isConnectPhaseError(error)) {
+      return new AIRequestError(`AI 连接失败: ${sanitizeErrorText(error.message)}`, { retryable: true });
+    }
     return new AIRequestError(error.message);
   }
 
@@ -970,8 +981,21 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
     const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
     const timeoutMs = pickTimeoutMs('connection_test', provider.model);
-    let res: Response;
+    let res: Response | undefined;
     let strategy: 'models' | 'chat_completion' = 'models';
+    const logFailure = (requestError: AIRequestError) => {
+      logger.error('ai.connection.failed', {
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        durationMs: Date.now() - startedAt,
+        strategy,
+        retryable: requestError.retryable,
+        statusCode: requestError.statusCode,
+        error: sanitizeErrorText(requestError.message),
+      });
+    };
 
     try {
       res = await requestWithAgent({
@@ -985,7 +1009,22 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
       });
 
       if (!res.ok && [404, 405, 501].includes(res.status)) {
-        strategy = 'chat_completion';
+        throw new AIRequestError('models probe unsupported', { retryable: true, statusCode: res.status });
+      }
+    } catch (error) {
+      const requestError = toRequestError(error);
+      const shouldFallbackToChat = strategy === 'models' && (
+        requestError.retryable
+        || [404, 405, 501].includes(requestError.statusCode ?? 0)
+      );
+
+      if (!shouldFallbackToChat) {
+        logFailure(requestError);
+        throw requestError;
+      }
+
+      strategy = 'chat_completion';
+      try {
         res = await postChatCompletions(provider, {
           model: provider.model,
           messages: [
@@ -995,20 +1034,16 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
           max_tokens: 5,
           timeoutMs,
         });
+      } catch (chatError) {
+        const chatRequestError = toRequestError(chatError);
+        logFailure(chatRequestError);
+        throw chatRequestError;
       }
-    } catch (error) {
-      const requestError = toRequestError(error);
-      logger.error('ai.connection.failed', {
-        providerHost,
-        provider: provider.name,
-        source: provider.source,
-        model: provider.model,
-        durationMs: Date.now() - startedAt,
-        strategy,
-        retryable: requestError.retryable,
-        statusCode: requestError.statusCode,
-        error: sanitizeErrorText(requestError.message),
-      });
+    }
+
+    if (!res) {
+      const requestError = new AIRequestError('连接测试未返回响应');
+      logFailure(requestError);
       throw requestError;
     }
 

@@ -1,36 +1,30 @@
 // Prompt templates — preserved from original ai-service.js
 
-export function buildExtractWordsPrompt(text: string, maxWords: number, level: string, options?: { compact?: boolean }): string {
+export function buildExtractWordsPrompt(text: string, maxWords: number, level: string): string {
   let levelPrompt = '';
   switch (level) {
     case 'cet4':
-      levelPrompt = '优先 CET-4 及以上难度词汇';
+      levelPrompt = '请提取CET-4以上难度的单词，即大学英语四级以上水平的词汇';
       break;
     case 'cet6':
-      levelPrompt = '优先 CET-6 及以上难度词汇';
+      levelPrompt = '请提取CET-6以上难度的单词，即大学英语六级以上水平的词汇';
       break;
     case 'advanced':
-      levelPrompt = '优先高级、专业或学术场景词汇';
+      levelPrompt = '请提取高级词汇，即专业英语或学术英语中常见的高难度词汇';
       break;
     default:
-      levelPrompt = '提取真正值得学习的词汇';
+      levelPrompt = '请提取各种难度级别的值得学习的单词';
   }
 
-  if (options?.compact) {
-    return `你是英语词汇学习助手。请从文本中筛选最值得学习的 ${maxWords} 个单词或短语，${levelPrompt}。
+  return `请从以下英语文本中提取${maxWords}个单词或短语，${levelPrompt}，并为每个单词提供以下信息：
+1. 单词本身
+2. 音标
+3. 中文定义
+4. 词源简介
+5. 英语例句
+6. 例句中文翻译
 
-硬性限制：
-- 宁缺毋滥；如果有效词汇不足，可以少于 ${maxWords} 个
-- 忽略基础词、重复词、纯专有名词
-- 只保留真正影响理解或值得积累的词/短语
-- definition 尽量不超过 14 个字
-- etymology 尽量不超过 10 个字
-- example 尽量不超过 10 个英文词
-- exampleTranslation 尽量不超过 16 个字
-- phonetic 可为空字符串
-- 只返回合法 JSON，不要 Markdown，不要额外解释
-
-返回格式：
+请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 [
   {
     "word": "单词",
@@ -42,124 +36,20 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
   }
 ]
 
-文本：
-${text}`;
-  }
-
-  return `你是英语词汇学习助手。请从文本中筛选最值得学习的 ${maxWords} 个单词或短语，${levelPrompt}。
-
-要求：
-- 宁缺毋滥；如果有效词汇不足，可以少于 ${maxWords} 个
-- 忽略明显基础词、重复词、纯专有名词
-- definition 用简洁中文，尽量不超过 20 个字
-- etymology 用一句短说明，尽量不超过 18 个字
-- example 使用贴近原文语境的短句，尽量不超过 16 个英文词
-- exampleTranslation 用简洁中文，尽量不超过 24 个字
-- 只返回合法 JSON，不要 Markdown，不要额外解释
-
-返回格式：
-[
-  {
-    "word": "单词",
-    "phonetic": "音标",
-    "definition": "定义",
-    "etymology": "词源",
-    "example": "例句",
-    "exampleTranslation": "例句翻译"
-  }
-]
-
-文本：
-${text}`;
+文本：${text}`;
 }
 
-export function buildAnalyzeSentencePrompt(sentence: string, options?: { compact?: boolean }): string {
-  if (options?.compact) {
-    return `你是英语语法分析助手。请快速输出核心分析，只返回合法 JSON。
+export function buildAnalyzeSentencePrompt(sentence: string): string {
+  return `请你作为一位专业的英语语法分析专家，对下面这个英文句子进行全面细致的语法分析。请按照以下七个部分逐一分析，并用中文准确无误的输出结果：
+1. 句子结构（简单句、复合句、复杂句等）
+2. 从句分析（如果有）
+3. 时态分析
+4. 句子成分标注（主语、谓语、宾语、定语、状语、补语、同位语等）
+5. 词级信息（词形还原、词性、核心语义、句中作用）
+6. 重要短语解析
+7. 语法要点解释（请附上标签）
 
-硬性限制：
-- clauses 最多 4 条
-- tense 最多 2 条
-- components 最多 5 条
-- words 最多 8 条，只保留最关键的实词/语法词
-- phrases 最多 4 条
-- grammarPoints 最多 3 条，tags 每项最多 2 个
-- 所有 explanation / meaning / role / function 都尽量短，避免重复原句
-- 没有内容就返回空数组
-- 不要 Markdown，不要额外说明
-
-返回格式：
-{
-  "structure": {
-    "type": "句型",
-    "explanation": "结构说明",
-    "pattern": "句型公式"
-  },
-  "clauses": [
-    {
-      "text": "片段",
-      "type": "类型",
-      "function": "功能",
-      "connector": "连接词"
-    }
-  ],
-  "tense": [
-    {
-      "name": "时态",
-      "explanation": "说明"
-    }
-  ],
-  "components": [
-    {
-      "text": "成分",
-      "type": "类型",
-      "explanation": "说明"
-    }
-  ],
-  "words": [
-    {
-      "text": "词",
-      "lemma": "原形",
-      "partOfSpeech": "词性",
-      "meaning": "含义",
-      "role": "作用"
-    }
-  ],
-  "phrases": [
-    {
-      "text": "短语",
-      "category": "类别",
-      "function": "作用",
-      "explanation": "说明"
-    }
-  ],
-  "grammarPoints": [
-    {
-      "title": "语法点",
-      "explanation": "说明",
-      "tags": ["标签1", "标签2"]
-    }
-  ]
-}
-
-句子：
-${sentence}`;
-  }
-
-  return `你是英语语法分析助手。请对下面句子做准确、精炼的语法分析，并只返回合法 JSON。
-
-分析要求：
-- 结构说明要准确，但避免长段落重复
-- clauses 最多 6 条
-- tense 最多 3 条
-- components 最多 8 条，只保留关键成分
-- words 最多 18 条，覆盖主要实词和关键语法词，不必穷举全部虚词
-- phrases 最多 6 条
-- grammarPoints 最多 5 条
-- 每个 explanation 尽量控制在 1 句话内
-- 不要输出 Markdown、前后说明或额外字段
-
-返回格式：
+请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 {
   "structure": {
     "type": "句子类型",
@@ -211,8 +101,7 @@ ${sentence}`;
   ]
 }
 
-句子：
-${sentence}`;
+句子：${sentence}`;
 }
 
 interface ReadingPromptOptions {
@@ -247,25 +136,26 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
   const lengthPrompt = lengthPromptMap[options.length];
 
   if (options.language === 'en') {
-    return `你是中英双语阅读助手。请把英文原文翻译成自然中文，并提取少量重点词汇。
+    return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，将以下英文文本翻译成中文，并提取重要词汇：
 
-风格偏好（仅用于同义表达取舍，不允许改变原文信息量）：
-- 主题：${topicPrompt}
-- 难度：${difficultyPrompt}
-- 篇幅：${lengthPrompt}
+英文原文：${text}
 
-要求：
-- english 字段必须原样保留英文原文，不可改写
-- chinese 字段只做忠实、自然的中文翻译，不扩写、不总结
-- title 给出一个简短标题，可为空
-- vocabulary 最多 8 项，meaning/example 保持简洁
-- 只返回合法 JSON，不要 Markdown，不要额外解释
+生成要求：
+- 主题导向：${topicPrompt}
+- 难度要求：${difficultyPrompt}
+- 篇幅控制：${lengthPrompt}
 
-返回格式：
+请提供以下内容：
+1. 保持原始英文文本不变
+2. 高质量的中文翻译
+3. 保持原文意境与情感
+4. 如遇文化差异、习语或专有名词，请合理本地化处理，并保持专业性
+5. 从文本中提取10个以内高频词汇，包含：英文单词、音标、中文释义、例句
+
+请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 {
   "english": "原始英文文本",
   "chinese": "中文翻译",
-  "title": "可选标题",
   "vocabulary": [
     {
       "word": "单词",
@@ -274,31 +164,29 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
       "example": "例句"
     }
   ]
-}
-
-英文原文：
-${text}`;
+}`;
   }
 
-  return `你是中英双语阅读助手。请把中文原文翻译成自然英文，并提取少量重点词汇。
+  return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，请将以下中文文本翻译成英文，并提取重要词汇：
 
-风格偏好（仅用于表达取舍，不允许新增或删减信息）：
-- 主题：${topicPrompt}
-- 难度：${difficultyPrompt}
-- 篇幅：${lengthPrompt}
+中文原文：${text}
 
-要求：
-- chinese 字段必须原样保留中文原文
-- english 字段输出忠实、自然的英文译文，不扩写、不总结
-- title 给出一个简短英文标题，可为空
-- vocabulary 最多 8 项，meaning/example 保持简洁
-- 只返回合法 JSON，不要 Markdown，不要额外解释
+生成要求：
+- 主题导向：${topicPrompt}
+- 难度要求：${difficultyPrompt}
+- 篇幅控制：${lengthPrompt}
 
-返回格式：
+请提供以下内容：
+1. 保持原始中文文本不变
+2. 高质量的英文翻译
+3. 保持原文意境与情感
+4. 如遇文化差异、习语或专有名词，请合理本地化处理，并保持专业性
+5. 从英文翻译中提取10个以内高频词汇，包含：英文单词、音标、中文释义、例句
+
+请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 {
   "english": "英文翻译",
   "chinese": "原始中文文本",
-  "title": "可选标题",
   "vocabulary": [
     {
       "word": "单词",
@@ -307,10 +195,7 @@ ${text}`;
       "example": "例句"
     }
   ]
-}
-
-中文原文：
-${text}`;
+}`;
 }
 
 interface QuizPromptOptions {

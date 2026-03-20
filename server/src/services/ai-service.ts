@@ -1,7 +1,3 @@
-import { createHash } from 'crypto';
-import dns from 'dns';
-import http from 'http';
-import https from 'https';
 import { parseJsonResponse } from '../utils/json-parser';
 import {
   buildExtractWordsPrompt,
@@ -11,22 +7,11 @@ import {
   buildVocabularyQuestionsPrompt,
   buildLearningReportPrompt,
 } from '../utils/prompt-builder';
-import {
-  estimateCompactFlashcardsMaxTokens,
-  estimateFlashcardsMaxTokens,
-  estimateReadingMaxTokens,
-  estimateSentenceMaxTokens,
-} from '../utils/ai-request-planner';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
 interface ChatCompletionResponse {
   choices: Array<{ message: { content: string } }>;
-}
-
-interface ChatMessage {
-  role: 'system' | 'user';
-  content: string;
 }
 
 interface AIConfig {
@@ -70,60 +55,7 @@ interface ProviderQuotaState {
   count: number;
 }
 
-interface RequestOptions {
-  action: string;
-  temperature?: number;
-  maxTokens?: number;
-  timeoutMs?: number;
-}
-
-interface AgentRequestOptions {
-  urlString: string;
-  method: 'GET' | 'POST';
-  headers: Record<string, string>;
-  body?: string;
-  timeoutMs: number;
-}
-
-type ModelProfile = 'standard' | 'large_generation' | 'slow_reasoning';
-
 const providerQuotaState = new Map<string, ProviderQuotaState>();
-const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
-const inflightRequestCache = new Map<string, Promise<string>>();
-const hostAddressState = new Map<string, {
-  addresses: string[];
-  nextIndex: number;
-  lastSuccessfulAddress?: string;
-}>();
-const REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
-const CONNECT_TIMEOUT_MS = 8_000;
-const CONNECT_RETRY_ATTEMPTS = 3;
-const httpAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: 32,
-});
-const httpsAgent = new https.Agent({
-  keepAlive: true,
-  maxSockets: 32,
-});
-const JSON_ONLY_SYSTEM_PROMPT = [
-  '你是英语学习助手。',
-  '必须只返回合法 JSON。',
-  '不要输出 Markdown、代码块、解释、思考过程或额外字段。',
-  '字段内容保持简洁直接。',
-].join('');
-
-class AIRequestError extends Error {
-  readonly retryable: boolean;
-  readonly statusCode?: number;
-
-  constructor(message: string, options: { retryable?: boolean; statusCode?: number } = {}) {
-    super(message);
-    this.name = 'AIRequestError';
-    this.retryable = options.retryable ?? false;
-    this.statusCode = options.statusCode;
-  }
-}
 
 function isPrivateOrLocalhost(hostname: string): boolean {
   const host = hostname.toLowerCase();
@@ -216,21 +148,7 @@ function validateBaseUrl(baseUrl: string): string {
 }
 
 function buildCompletionsEndpoint(baseUrl: string): string {
-  const normalized = baseUrl.replace(/\/+$/, '');
-  return normalized.endsWith('/chat/completions')
-    ? normalized
-    : `${normalized}/chat/completions`;
-}
-
-function buildModelsEndpoint(baseUrl: string): string {
-  const normalized = baseUrl.replace(/\/+$/, '');
-  if (normalized.endsWith('/models')) {
-    return normalized;
-  }
-  if (normalized.endsWith('/chat/completions')) {
-    return `${normalized.slice(0, -'/chat/completions'.length)}/models`;
-  }
-  return `${normalized}/models`;
+  return `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
 }
 
 function readHost(baseUrl: string): string {
@@ -266,345 +184,6 @@ function reserveQuota(provider: ProviderCandidate): boolean {
   state.count += 1;
   providerQuotaState.set(key, state);
   return true;
-}
-
-function normalizeModelName(modelName: string): string {
-  return modelName.trim().toLowerCase();
-}
-
-function parseModelSizeInBillions(modelName: string): number | undefined {
-  const normalized = normalizeModelName(modelName);
-  const match = normalized.match(/(?:^|[^a-z0-9])(\d{2,3})b(?:[^a-z0-9]|$)/);
-  if (!match) return undefined;
-
-  const size = Number(match[1]);
-  return Number.isFinite(size) ? size : undefined;
-}
-
-function getModelProfile(modelName: string): ModelProfile {
-  const normalized = normalizeModelName(modelName);
-  if (!normalized) return 'standard';
-
-  const slowReasoning = normalized.includes('reasoner')
-    || normalized.includes('reasoning')
-    || normalized.includes('thinking')
-    || normalized.startsWith('gpt-5')
-    || normalized === 'o1'
-    || normalized.startsWith('o1-')
-    || normalized === 'o3'
-    || normalized.startsWith('o3-')
-    || normalized.includes('r1');
-
-  if (slowReasoning) {
-    return 'slow_reasoning';
-  }
-
-  const sizeInBillions = parseModelSizeInBillions(normalized);
-  if (sizeInBillions !== undefined && sizeInBillions >= 24) {
-    return 'large_generation';
-  }
-
-  return 'standard';
-}
-
-function pickTimeoutMs(action: string, modelName: string): number {
-  const modelProfile = getModelProfile(modelName);
-
-  switch (action) {
-    case 'connection_test':
-      return modelProfile === 'slow_reasoning' ? 40_000 : modelProfile === 'large_generation' ? 25_000 : 15_000;
-    case 'extract_words':
-      return modelProfile === 'slow_reasoning' ? 90_000 : modelProfile === 'large_generation' ? 75_000 : 45_000;
-    case 'analyze_sentence':
-      return modelProfile === 'slow_reasoning' ? 210_000 : modelProfile === 'large_generation' ? 120_000 : 55_000;
-    case 'generate_reading':
-      return modelProfile === 'slow_reasoning' ? 210_000 : modelProfile === 'large_generation' ? 120_000 : 60_000;
-    case 'generate_reading_questions':
-    case 'generate_vocabulary_questions':
-      return modelProfile === 'slow_reasoning' ? 90_000 : modelProfile === 'large_generation' ? 75_000 : 45_000;
-    case 'generate_learning_report':
-      return modelProfile === 'slow_reasoning' ? 120_000 : modelProfile === 'large_generation' ? 75_000 : 60_000;
-    default:
-      return config.ai.requestTimeoutMs;
-  }
-}
-
-function buildRequestCacheKey(provider: ProviderCandidate, action: string, prompt: string, maxTokens: number): string {
-  const promptHash = createHash('sha1').update(prompt).digest('hex');
-  return [
-    provider.source,
-    provider.name,
-    readHost(provider.baseUrl),
-    provider.model,
-    action,
-    String(maxTokens),
-    promptHash,
-  ].join(':');
-}
-
-function readCachedContent(cacheKey: string): string | undefined {
-  const hit = completedRequestCache.get(cacheKey);
-  if (!hit) return undefined;
-
-  if (Date.now() >= hit.expiresAt) {
-    completedRequestCache.delete(cacheKey);
-    return undefined;
-  }
-
-  return hit.content;
-}
-
-function writeCachedContent(cacheKey: string, content: string): void {
-  completedRequestCache.set(cacheKey, {
-    content,
-    expiresAt: Date.now() + REQUEST_CACHE_TTL_MS,
-  });
-}
-
-function describeErrorCause(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-
-  const cause = (error as Error & {
-    cause?: unknown;
-  }).cause;
-
-  if (!cause) return undefined;
-  if (cause instanceof Error) {
-    return cause.message;
-  }
-
-  if (typeof cause === 'object') {
-    const code = typeof (cause as { code?: unknown }).code === 'string'
-      ? (cause as { code: string }).code
-      : undefined;
-    const message = typeof (cause as { message?: unknown }).message === 'string'
-      ? (cause as { message: string }).message
-      : undefined;
-
-    if (code && message) return `${code}: ${message}`;
-    if (code) return code;
-    if (message) return message;
-  }
-
-  if (typeof cause === 'string') {
-    return cause;
-  }
-
-  return undefined;
-}
-
-function recordSuccessfulAddress(hostname: string, address: string | undefined): void {
-  if (!address) return;
-
-  const state = hostAddressState.get(hostname);
-  hostAddressState.set(hostname, {
-    addresses: state?.addresses ?? [],
-    nextIndex: state?.nextIndex ?? 0,
-    lastSuccessfulAddress: address,
-  });
-}
-
-function clearPreferredAddress(hostname: string): void {
-  const state = hostAddressState.get(hostname);
-  if (!state) return;
-
-  hostAddressState.set(hostname, {
-    addresses: state.addresses,
-    nextIndex: state.nextIndex,
-    lastSuccessfulAddress: undefined,
-  });
-}
-
-function rotateAddresses(addresses: string[], startIndex: number): string[] {
-  if (addresses.length <= 1) return [...addresses];
-
-  const offset = startIndex % addresses.length;
-  return [
-    ...addresses.slice(offset),
-    ...addresses.slice(0, offset),
-  ];
-}
-
-async function resolveConnectionTargets(hostname: string): Promise<string[]> {
-  const state = hostAddressState.get(hostname);
-  const preferred = state?.lastSuccessfulAddress ? [state.lastSuccessfulAddress] : [];
-
-  try {
-    const resolved = await dns.promises.lookup(hostname, { all: true, family: 4 });
-    const addresses = resolved.map(item => item.address).filter(Boolean);
-    if (addresses.length === 0) {
-      return preferred.length > 0 ? preferred : [hostname];
-    }
-
-    const rotated = rotateAddresses(addresses, state?.nextIndex ?? 0);
-    hostAddressState.set(hostname, {
-      addresses,
-      nextIndex: ((state?.nextIndex ?? 0) + 1) % addresses.length,
-      lastSuccessfulAddress: state?.lastSuccessfulAddress,
-    });
-
-    return Array.from(new Set([...preferred, ...rotated])).slice(0, CONNECT_RETRY_ATTEMPTS);
-  } catch {
-    return preferred.length > 0 ? preferred : [hostname];
-  }
-}
-
-function makeHttpResponse(status: number, statusText: string, body: string): Response {
-  return new Response(body, {
-    status,
-    statusText,
-    headers: {
-      'content-type': 'application/json',
-    },
-  });
-}
-
-function isConnectPhaseError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  if (error.message.startsWith('connect_timeout:')) return true;
-
-  const code = typeof (error as Error & { code?: unknown }).code === 'string'
-    ? (error as Error & { code: string }).code
-    : '';
-
-  return code === 'ETIMEDOUT'
-    || code === 'ECONNREFUSED'
-    || code === 'EHOSTUNREACH'
-    || code === 'ENETUNREACH'
-    || code === 'ECONNRESET';
-}
-
-function buildHostHeader(url: URL): string {
-  if (!url.port) return url.hostname;
-  return `${url.hostname}:${url.port}`;
-}
-
-async function postJsonWithAgent(urlString: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<Response> {
-  return requestWithAgent({
-    urlString,
-    method: 'POST',
-    headers,
-    body,
-    timeoutMs,
-  });
-}
-
-async function requestWithAgent(options: AgentRequestOptions): Promise<Response> {
-  const url = new URL(options.urlString);
-  const isHttps = url.protocol === 'https:';
-  const client = isHttps ? https : http;
-  const agent = isHttps ? httpsAgent : httpAgent;
-  const targets = await resolveConnectionTargets(url.hostname);
-  let lastError: Error | undefined;
-
-  for (const target of targets) {
-    try {
-      return await new Promise<Response>((resolve, reject) => {
-        const req = client.request({
-          protocol: url.protocol,
-          hostname: target,
-          servername: isHttps ? url.hostname : undefined,
-          port: url.port || (isHttps ? 443 : 80),
-          path: `${url.pathname}${url.search}`,
-          method: options.method,
-          agent,
-          headers: {
-            Host: buildHostHeader(url),
-            ...options.headers,
-            ...(options.body ? { 'Content-Length': Buffer.byteLength(options.body).toString() } : {}),
-          },
-        }, res => {
-          const chunks: Buffer[] = [];
-
-          res.on('data', chunk => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          });
-
-          res.on('end', () => {
-            clearTimeout(overallTimer);
-            const responseBody = Buffer.concat(chunks).toString('utf8');
-            recordSuccessfulAddress(url.hostname, target);
-            resolve(makeHttpResponse(
-              res.statusCode || 500,
-              res.statusMessage || 'Unknown Status',
-              responseBody,
-            ));
-          });
-        });
-
-        const overallTimer = setTimeout(() => {
-          req.destroy(new Error(`response_timeout:${options.timeoutMs}`));
-        }, options.timeoutMs);
-
-        req.on('socket', socket => {
-          socket.setKeepAlive(true);
-
-          if (socket.connecting) {
-            socket.setTimeout(CONNECT_TIMEOUT_MS);
-            socket.once('connect', () => {
-              recordSuccessfulAddress(url.hostname, target);
-              socket.setTimeout(0);
-            });
-            socket.once('timeout', () => {
-              req.destroy(new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`));
-            });
-          } else {
-            recordSuccessfulAddress(url.hostname, target);
-          }
-        });
-
-        req.on('error', error => {
-          clearTimeout(overallTimer);
-          reject(error);
-        });
-
-        if (options.body) {
-          req.write(options.body);
-        }
-        req.end();
-      });
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      clearPreferredAddress(url.hostname);
-
-      if (!isConnectPhaseError(lastError)) {
-        throw lastError;
-      }
-    }
-  }
-
-  throw lastError ?? new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`);
-}
-
-function isRetryableStatusCode(statusCode: number): boolean {
-  return statusCode === 408
-    || statusCode === 409
-    || statusCode === 425
-    || statusCode === 429
-    || statusCode >= 500;
-}
-
-function toRequestError(error: unknown): AIRequestError {
-  if (error instanceof AIRequestError) {
-    return error;
-  }
-
-  if (error instanceof Error) {
-    if (error.message.startsWith('response_timeout:')) {
-      const timeoutMs = Number(error.message.split(':')[1] || '0');
-      return new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
-    }
-    if (error.message.startsWith('connect_timeout:')) {
-      const timeoutMs = Number(error.message.split(':')[1] || '0');
-      return new AIRequestError(`AI 连接超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
-    }
-    if (isConnectPhaseError(error)) {
-      return new AIRequestError(`AI 连接失败: ${sanitizeErrorText(error.message)}`, { retryable: true });
-    }
-    return new AIRequestError(error.message);
-  }
-
-  return new AIRequestError(String(error));
 }
 
 function buildProviderCandidates(primary: AIConfig): ProviderCandidate[] {
@@ -645,7 +224,7 @@ async function withProviderFallback<T>(
   runner: (provider: ProviderCandidate) => Promise<T>,
 ): Promise<T> {
   const candidates = buildProviderCandidates(primary);
-  let lastError: AIRequestError | undefined;
+  let lastError: Error | undefined;
   let attempted = 0;
 
   for (const provider of candidates) {
@@ -674,21 +253,16 @@ async function withProviderFallback<T>(
     try {
       return await runner(provider);
     } catch (error) {
-      lastError = toRequestError(error);
+      const message = error instanceof Error ? error.message : '未知错误';
+      lastError = error instanceof Error ? error : new Error(String(error));
       logger.warn('ai.provider.attempt.failed', {
         action,
         provider: provider.name,
         source: provider.source,
         providerHost: readHost(provider.baseUrl),
         model: provider.model,
-        retryable: lastError.retryable,
-        statusCode: lastError.statusCode,
-        error: sanitizeErrorText(lastError.message),
+        error: sanitizeErrorText(message),
       });
-
-      if (!lastError.retryable) {
-        throw lastError;
-      }
     }
   }
 
@@ -758,8 +332,7 @@ function normalizeReadingResponse(payload: unknown) {
       meaning: typeof item.meaning === 'string' ? item.meaning.trim() : '',
       example: typeof item.example === 'string' ? item.example.trim() : undefined,
     }))
-    .filter(item => item.word && item.meaning)
-    .slice(0, 8);
+    .filter(item => item.word && item.meaning);
 
   return {
     english,
@@ -770,314 +343,62 @@ function normalizeReadingResponse(payload: unknown) {
 }
 
 async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unknown>): Promise<Response> {
-  const timeoutMs = typeof body.timeoutMs === 'number'
-    ? body.timeoutMs
-    : config.ai.requestTimeoutMs;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.ai.requestTimeoutMs);
 
   try {
-    const payload = { ...body };
-    delete payload.timeoutMs;
-    return await postJsonWithAgent(
-      buildCompletionsEndpoint(aiConfig.baseUrl),
-      {
+    return await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
+      method: 'POST',
+      headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${aiConfig.apiKey}`,
       },
-      JSON.stringify(payload),
-      timeoutMs,
-    );
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('response_timeout:')) {
-      throw new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
-    }
-    if (err instanceof Error && err.message.startsWith('connect_timeout:')) {
-      throw new AIRequestError(
-        `AI 连接超时（单次 >${Math.floor(CONNECT_TIMEOUT_MS / 1000)}s，已重试 ${CONNECT_RETRY_ATTEMPTS} 次）`,
-        { retryable: true },
-      );
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`AI 请求超时（>${Math.floor(config.ai.requestTimeoutMs / 1000)}s）`);
     }
     const fallback = err instanceof Error ? err.message : '未知网络错误';
-    const cause = describeErrorCause(err);
-    const detail = cause ? `${fallback} | ${cause}` : fallback;
-    throw new AIRequestError(`AI 请求失败: ${sanitizeErrorText(detail)}`, { retryable: true });
+    throw new Error(`AI 请求失败: ${sanitizeErrorText(fallback)}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
-async function sendRequest(prompt: string, options: RequestOptions, aiConfig?: AIConfig): Promise<string> {
+async function sendRequest(prompt: string, options: { temperature?: number; maxTokens?: number } = {}, aiConfig?: AIConfig): Promise<string> {
   validateAIConfig(aiConfig);
-  const messages: ChatMessage[] = [
-    { role: 'system', content: JSON_ONLY_SYSTEM_PROMPT },
-    { role: 'user', content: prompt },
-  ];
-  const maxTokens = options.maxTokens ?? 2000;
-  const timeoutMs = options.timeoutMs ?? pickTimeoutMs(options.action, aiConfig.model);
-  const promptChars = messages.reduce((total, item) => total + item.content.length, 0);
-
-  return withProviderFallback(aiConfig, options.action, async provider => {
-    const providerHost = readHost(provider.baseUrl);
-    const modelProfile = getModelProfile(provider.model);
-    const cacheKey = buildRequestCacheKey(provider, options.action, prompt, maxTokens);
-    const cachedContent = readCachedContent(cacheKey);
-    if (cachedContent) {
-      logger.info('ai.request.cache_hit', {
-        action: options.action,
-        providerHost,
-        provider: provider.name,
-        source: provider.source,
-        model: provider.model,
-        modelProfile,
-      });
-      return cachedContent;
-    }
-
-    const inflightRequest = inflightRequestCache.get(cacheKey);
-    if (inflightRequest) {
-      logger.info('ai.request.inflight_reused', {
-        action: options.action,
-        providerHost,
-        provider: provider.name,
-        source: provider.source,
-        model: provider.model,
-        modelProfile,
-      });
-      return inflightRequest;
-    }
-
-    const requestPromise = (async () => {
-      const startedAt = Date.now();
-      let res: Response;
-
-      logger.info('ai.request.started', {
-        action: options.action,
-        providerHost,
-        provider: provider.name,
-        source: provider.source,
-        model: provider.model,
-        modelProfile,
-        promptChars,
-        maxTokens,
-        timeoutMs,
-      });
-
-      try {
-        res = await postChatCompletions(provider, {
-          model: provider.model,
-          messages,
-          temperature: options.temperature ?? 0.3,
-          max_tokens: maxTokens,
-          timeoutMs,
-        });
-      } catch (error) {
-        const requestError = toRequestError(error);
-        logger.error('ai.request.failed', {
-          action: options.action,
-          providerHost,
-          provider: provider.name,
-          source: provider.source,
-          model: provider.model,
-          modelProfile,
-          durationMs: Date.now() - startedAt,
-          retryable: requestError.retryable,
-          statusCode: requestError.statusCode,
-          error: sanitizeErrorText(requestError.message),
-        });
-        throw requestError;
-      }
-
-      logger.info('ai.request.completed', {
-        action: options.action,
-        providerHost,
-        provider: provider.name,
-        source: provider.source,
-        model: provider.model,
-        modelProfile,
-        statusCode: res.status,
-        ok: res.ok,
-        durationMs: Date.now() - startedAt,
-        promptChars,
-        maxTokens,
-        timeoutMs,
-      });
-
-      if (!res.ok) {
-        const errBody = await safeReadJson<ErrorBody>(res);
-        const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
-        const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
-        throw new AIRequestError(
-          `AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`,
-          { retryable: isRetryableStatusCode(res.status), statusCode: res.status },
-        );
-      }
-
-      const dataResult = await safeReadJson<ChatCompletionResponse>(res);
-      if (!dataResult.ok || !dataResult.data) {
-        throw new AIRequestError('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
-      }
-
-      const data = dataResult.data;
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new AIRequestError('AI 返回内容为空，请稍后重试', { retryable: true });
-      }
-
-      writeCachedContent(cacheKey, content);
-      return content;
-    })();
-
-    inflightRequestCache.set(cacheKey, requestPromise);
-    try {
-      return await requestPromise;
-    } finally {
-      inflightRequestCache.delete(cacheKey);
-    }
-  });
-}
-
-export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
-  const modelProfile = getModelProfile(aiConfig?.model ?? '');
-  const compactMode = modelProfile !== 'standard';
-  const prompt = buildExtractWordsPrompt(text, maxWords, level, compactMode ? { compact: true } : undefined);
-  const content = await sendRequest(prompt, {
-    action: 'extract_words',
-    temperature: compactMode ? 0 : 0.2,
-    maxTokens: compactMode ? estimateCompactFlashcardsMaxTokens(maxWords) : estimateFlashcardsMaxTokens(maxWords),
-  }, aiConfig);
-  return parseJsonResponse(content);
-}
-
-export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
-  const compactMode = getModelProfile(aiConfig?.model ?? '') !== 'standard';
-  const prompt = buildAnalyzeSentencePrompt(sentence, compactMode ? { compact: true } : undefined);
-  const content = await sendRequest(prompt, {
-    action: 'analyze_sentence',
-    temperature: compactMode ? 0 : 0.2,
-    maxTokens: compactMode ? 850 : estimateSentenceMaxTokens(sentence),
-  }, aiConfig);
-  return parseJsonResponse(content);
-}
-
-export async function generateReadingContent(text: string, options?: Partial<ReadingGenerateOptions>, aiConfig?: AIConfig) {
-  const normalizedOptions = normalizeReadingOptions(options);
-  const prompt = buildReadingContentPrompt(text, normalizedOptions);
-  const content = await sendRequest(prompt, {
-    action: 'generate_reading',
-    temperature: 0.2,
-    maxTokens: estimateReadingMaxTokens(text, normalizedOptions.language),
-  }, aiConfig);
-  const result = parseJsonResponse(content);
-  return normalizeReadingResponse(result);
-}
-
-export async function generateReadingQuestions(reading: string, options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
-  const normalizedOptions = normalizeQuizOptions(options);
-  const prompt = buildReadingQuestionsPrompt(reading, normalizedOptions);
-  const content = await sendRequest(prompt, {
-    action: 'generate_reading_questions',
-    temperature: 0.2,
-    maxTokens: 1100,
-  }, aiConfig);
-  return parseJsonResponse(content);
-}
-
-export async function generateVocabularyQuestions(vocabulary: unknown[], options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
-  const normalizedOptions = normalizeQuizOptions(options);
-  const prompt = buildVocabularyQuestionsPrompt(vocabulary, normalizedOptions);
-  const content = await sendRequest(prompt, {
-    action: 'generate_vocabulary_questions',
-    temperature: 0.2,
-    maxTokens: 1100,
-  }, aiConfig);
-  return parseJsonResponse(content);
-}
-
-export async function generateLearningReport(reportType: string, learningData: unknown, aiConfig?: AIConfig) {
-  const prompt = buildLearningReportPrompt(reportType, learningData);
-  const content = await sendRequest(prompt, {
-    action: 'generate_learning_report',
-    temperature: 0.3,
-    maxTokens: 1400,
-  }, aiConfig);
-  return parseJsonResponse(content);
-}
-
-export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
-  validateAIConfig(aiConfig);
-  return withProviderFallback(aiConfig, 'connection_test', async provider => {
+  return withProviderFallback(aiConfig, 'chat_completion', async provider => {
     const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
-    const timeoutMs = pickTimeoutMs('connection_test', provider.model);
-    let res: Response | undefined;
-    let strategy: 'models' | 'chat_completion' = 'models';
-    const logFailure = (requestError: AIRequestError) => {
-      logger.error('ai.connection.failed', {
+    let res: Response;
+
+    try {
+      res = await postChatCompletions(provider, {
+        model: provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 2000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      logger.error('ai.request.failed', {
         providerHost,
         provider: provider.name,
         source: provider.source,
         model: provider.model,
         durationMs: Date.now() - startedAt,
-        strategy,
-        retryable: requestError.retryable,
-        statusCode: requestError.statusCode,
-        error: sanitizeErrorText(requestError.message),
+        error: sanitizeErrorText(message),
       });
-    };
-
-    try {
-      res = await requestWithAgent({
-        urlString: buildModelsEndpoint(provider.baseUrl),
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${provider.apiKey}`,
-        },
-        timeoutMs: Math.min(timeoutMs, 20_000),
-      });
-
-      if (!res.ok && [404, 405, 501].includes(res.status)) {
-        throw new AIRequestError('models probe unsupported', { retryable: true, statusCode: res.status });
-      }
-    } catch (error) {
-      const requestError = toRequestError(error);
-      const shouldFallbackToChat = strategy === 'models' && (
-        requestError.retryable
-        || [404, 405, 501].includes(requestError.statusCode ?? 0)
-      );
-
-      if (!shouldFallbackToChat) {
-        logFailure(requestError);
-        throw requestError;
-      }
-
-      strategy = 'chat_completion';
-      try {
-        res = await postChatCompletions(provider, {
-          model: provider.model,
-          messages: [
-            { role: 'system', content: JSON_ONLY_SYSTEM_PROMPT },
-            { role: 'user', content: 'Hi' },
-          ],
-          max_tokens: 5,
-          timeoutMs,
-        });
-      } catch (chatError) {
-        const chatRequestError = toRequestError(chatError);
-        logFailure(chatRequestError);
-        throw chatRequestError;
-      }
+      throw error;
     }
 
-    if (!res) {
-      const requestError = new AIRequestError('连接测试未返回响应');
-      logFailure(requestError);
-      throw requestError;
-    }
-
-    logger.info('ai.connection.completed', {
+    logger.info('ai.request.completed', {
       providerHost,
       provider: provider.name,
       source: provider.source,
       model: provider.model,
-      strategy,
       statusCode: res.status,
       ok: res.ok,
       durationMs: Date.now() - startedAt,
@@ -1087,15 +408,109 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
       const errBody = await safeReadJson<ErrorBody>(res);
       const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
       const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
-      throw new AIRequestError(
-        `连接失败: ${sanitizeErrorText(upstreamMessage)}`,
-        { retryable: isRetryableStatusCode(res.status), statusCode: res.status },
-      );
+      throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
+    }
+
+    const dataResult = await safeReadJson<ChatCompletionResponse>(res);
+    if (!dataResult.ok || !dataResult.data) {
+      throw new Error('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
+    }
+
+    const data = dataResult.data;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('AI 返回内容为空，请稍后重试');
+    }
+    return content;
+  });
+}
+
+export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
+  const prompt = buildExtractWordsPrompt(text, maxWords, level);
+  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1000 }, aiConfig);
+  return parseJsonResponse(content);
+}
+
+export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
+  const prompt = buildAnalyzeSentencePrompt(sentence);
+  const content = await sendRequest(prompt, { temperature: 0.6, maxTokens: 2000 }, aiConfig);
+  return parseJsonResponse(content);
+}
+
+export async function generateReadingContent(text: string, options?: Partial<ReadingGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeReadingOptions(options);
+  const prompt = buildReadingContentPrompt(text, normalizedOptions);
+  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 2000 }, aiConfig);
+  const result = parseJsonResponse(content);
+  return normalizeReadingResponse(result);
+}
+
+export async function generateReadingQuestions(reading: string, options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeQuizOptions(options);
+  const prompt = buildReadingQuestionsPrompt(reading, normalizedOptions);
+  const content = await sendRequest(prompt, { temperature: 0.6, maxTokens: 1500 }, aiConfig);
+  return parseJsonResponse(content);
+}
+
+export async function generateVocabularyQuestions(vocabulary: unknown[], options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
+  const normalizedOptions = normalizeQuizOptions(options);
+  const prompt = buildVocabularyQuestionsPrompt(vocabulary, normalizedOptions);
+  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1500 }, aiConfig);
+  return parseJsonResponse(content);
+}
+
+export async function generateLearningReport(reportType: string, learningData: unknown, aiConfig?: AIConfig) {
+  const prompt = buildLearningReportPrompt(reportType, learningData);
+  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1500 }, aiConfig);
+  return parseJsonResponse(content);
+}
+
+export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
+  validateAIConfig(aiConfig);
+  return withProviderFallback(aiConfig, 'connection_test', async provider => {
+    const startedAt = Date.now();
+    const providerHost = readHost(provider.baseUrl);
+    let res: Response;
+
+    try {
+      res = await postChatCompletions(provider, {
+        model: provider.model,
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      logger.error('ai.connection.failed', {
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        durationMs: Date.now() - startedAt,
+        error: sanitizeErrorText(message),
+      });
+      throw error;
+    }
+
+    logger.info('ai.connection.completed', {
+      providerHost,
+      provider: provider.name,
+      source: provider.source,
+      model: provider.model,
+      statusCode: res.status,
+      ok: res.ok,
+      durationMs: Date.now() - startedAt,
+    });
+
+    if (!res.ok) {
+      const errBody = await safeReadJson<ErrorBody>(res);
+      const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+      const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
+      throw new Error(`连接失败: ${sanitizeErrorText(upstreamMessage)}`);
     }
 
     const okBody = await safeReadJson(res);
     if (!okBody.ok) {
-      throw new AIRequestError('连接失败: 上游返回非 JSON 内容');
+      throw new Error('连接失败: 上游返回非 JSON 内容');
     }
     return { success: true, model: provider.model };
   });

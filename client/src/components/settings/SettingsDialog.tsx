@@ -22,20 +22,6 @@ interface FieldErrors {
   model?: string;
 }
 
-function isReasoningModel(modelName: string): boolean {
-  const normalized = modelName.trim().toLowerCase();
-  if (!normalized) return false;
-
-  return normalized.includes('reasoner')
-    || normalized.includes('reasoning')
-    || normalized.startsWith('gpt-5')
-    || normalized === 'o1'
-    || normalized.startsWith('o1-')
-    || normalized === 'o3'
-    || normalized.startsWith('o3-')
-    || normalized.includes('r1');
-}
-
 export function SettingsDialog({ open, onClose }: Props) {
   const { toast } = useToast();
   const [providerId, setProviderId] = useState('deepseek');
@@ -79,7 +65,6 @@ export function SettingsDialog({ open, onClose }: Props) {
   }, []);
 
   const currentProvider = AI_PROVIDERS.find(p => p.id === providerId);
-  const showReasoningWarning = isReasoningModel(model);
 
   const validateForm = () => {
     const nextErrors: FieldErrors = {};
@@ -253,11 +238,6 @@ export function SettingsDialog({ open, onClose }: Props) {
             {!errors.model && currentProvider && currentProvider.models.length > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 常用: {currentProvider.models.join(', ')}
-              </p>
-            )}
-            {!errors.model && showReasoningWarning && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                当前像是推理型模型，生成结构化 JSON 时通常更慢。这个项目更适合 `deepseek-chat`、`gpt-4o-mini` 一类的非推理模型。
               </p>
             )}
           </div>

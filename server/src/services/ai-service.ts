@@ -373,33 +373,38 @@ function clearPreferredAddress(hostname: string): void {
   });
 }
 
-function lookupWithRotation(
-  hostname: string,
-  callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void,
-): void {
-  const state = hostAddressState.get(hostname);
-  if (state?.lastSuccessfulAddress) {
-    callback(null, state.lastSuccessfulAddress, 4);
-    return;
-  }
+function rotateAddresses(addresses: string[], startIndex: number): string[] {
+  if (addresses.length <= 1) return [...addresses];
 
-  dns.lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
-    if (error || !addresses.length) {
-      dns.lookup(hostname, { family: 4 }, callback);
-      return;
+  const offset = startIndex % addresses.length;
+  return [
+    ...addresses.slice(offset),
+    ...addresses.slice(0, offset),
+  ];
+}
+
+async function resolveConnectionTargets(hostname: string): Promise<string[]> {
+  const state = hostAddressState.get(hostname);
+  const preferred = state?.lastSuccessfulAddress ? [state.lastSuccessfulAddress] : [];
+
+  try {
+    const resolved = await dns.promises.lookup(hostname, { all: true, family: 4 });
+    const addresses = resolved.map(item => item.address).filter(Boolean);
+    if (addresses.length === 0) {
+      return preferred.length > 0 ? preferred : [hostname];
     }
 
-    const selectedIndex = state?.nextIndex ?? 0;
-    const selected = addresses[selectedIndex % addresses.length];
-
+    const rotated = rotateAddresses(addresses, state?.nextIndex ?? 0);
     hostAddressState.set(hostname, {
-      addresses: addresses.map(item => item.address),
-      nextIndex: (selectedIndex + 1) % addresses.length,
+      addresses,
+      nextIndex: ((state?.nextIndex ?? 0) + 1) % addresses.length,
       lastSuccessfulAddress: state?.lastSuccessfulAddress,
     });
 
-    callback(null, selected.address, selected.family);
-  });
+    return Array.from(new Set([...preferred, ...rotated])).slice(0, CONNECT_RETRY_ATTEMPTS);
+  } catch {
+    return preferred.length > 0 ? preferred : [hostname];
+  }
 }
 
 function makeHttpResponse(status: number, statusText: string, body: string): Response {
@@ -412,74 +417,109 @@ function makeHttpResponse(status: number, statusText: string, body: string): Res
   });
 }
 
+function isConnectPhaseError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.message.startsWith('connect_timeout:')) return true;
+
+  const code = typeof (error as Error & { code?: unknown }).code === 'string'
+    ? (error as Error & { code: string }).code
+    : '';
+
+  return code === 'ETIMEDOUT'
+    || code === 'ECONNREFUSED'
+    || code === 'EHOSTUNREACH'
+    || code === 'ENETUNREACH'
+    || code === 'ECONNRESET';
+}
+
+function buildHostHeader(url: URL): string {
+  if (!url.port) return url.hostname;
+  return `${url.hostname}:${url.port}`;
+}
+
 async function postJsonWithAgent(urlString: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<Response> {
   const url = new URL(urlString);
   const isHttps = url.protocol === 'https:';
   const client = isHttps ? https : http;
   const agent = isHttps ? httpsAgent : httpAgent;
+  const targets = await resolveConnectionTargets(url.hostname);
+  let lastError: Error | undefined;
 
-  return new Promise((resolve, reject) => {
-    const req = client.request({
-      protocol: url.protocol,
-      hostname: url.hostname,
-      port: url.port || (isHttps ? 443 : 80),
-      path: `${url.pathname}${url.search}`,
-      method: 'POST',
-      agent,
-      lookup: (hostname, _options, callback) => {
-        lookupWithRotation(hostname, callback);
-      },
-      headers: {
-        ...headers,
-        'Content-Length': Buffer.byteLength(body).toString(),
-      },
-    }, res => {
-      const chunks: Buffer[] = [];
+  for (const target of targets) {
+    try {
+      return await new Promise<Response>((resolve, reject) => {
+        const req = client.request({
+          protocol: url.protocol,
+          hostname: target,
+          servername: isHttps ? url.hostname : undefined,
+          port: url.port || (isHttps ? 443 : 80),
+          path: `${url.pathname}${url.search}`,
+          method: 'POST',
+          agent,
+          headers: {
+            Host: buildHostHeader(url),
+            ...headers,
+            'Content-Length': Buffer.byteLength(body).toString(),
+          },
+        }, res => {
+          const chunks: Buffer[] = [];
 
-      res.on('data', chunk => {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      });
+          res.on('data', chunk => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          });
 
-      res.on('end', () => {
-        clearTimeout(overallTimer);
-        const responseBody = Buffer.concat(chunks).toString('utf8');
-        resolve(makeHttpResponse(
-          res.statusCode || 500,
-          res.statusMessage || 'Unknown Status',
-          responseBody,
-        ));
-      });
-    });
-
-    const overallTimer = setTimeout(() => {
-      req.destroy(new Error(`response_timeout:${timeoutMs}`));
-    }, timeoutMs);
-
-    req.on('socket', socket => {
-      socket.setKeepAlive(true);
-
-      if (socket.connecting) {
-        socket.setTimeout(CONNECT_TIMEOUT_MS);
-        socket.once('connect', () => {
-          recordSuccessfulAddress(url.hostname, socket.remoteAddress);
-          socket.setTimeout(0);
+          res.on('end', () => {
+            clearTimeout(overallTimer);
+            const responseBody = Buffer.concat(chunks).toString('utf8');
+            recordSuccessfulAddress(url.hostname, target);
+            resolve(makeHttpResponse(
+              res.statusCode || 500,
+              res.statusMessage || 'Unknown Status',
+              responseBody,
+            ));
+          });
         });
-        socket.once('timeout', () => {
-          req.destroy(new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`));
+
+        const overallTimer = setTimeout(() => {
+          req.destroy(new Error(`response_timeout:${timeoutMs}`));
+        }, timeoutMs);
+
+        req.on('socket', socket => {
+          socket.setKeepAlive(true);
+
+          if (socket.connecting) {
+            socket.setTimeout(CONNECT_TIMEOUT_MS);
+            socket.once('connect', () => {
+              recordSuccessfulAddress(url.hostname, target);
+              socket.setTimeout(0);
+            });
+            socket.once('timeout', () => {
+              req.destroy(new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`));
+            });
+          } else {
+            recordSuccessfulAddress(url.hostname, target);
+          }
         });
-      } else {
-        recordSuccessfulAddress(url.hostname, socket.remoteAddress);
+
+        req.on('error', error => {
+          clearTimeout(overallTimer);
+          reject(error);
+        });
+
+        req.write(body);
+        req.end();
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      clearPreferredAddress(url.hostname);
+
+      if (!isConnectPhaseError(lastError)) {
+        throw lastError;
       }
-    });
+    }
+  }
 
-    req.on('error', error => {
-      clearTimeout(overallTimer);
-      reject(error);
-    });
-
-    req.write(body);
-    req.end();
-  });
+  throw lastError ?? new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`);
 }
 
 function isRetryableStatusCode(statusCode: number): boolean {
@@ -672,31 +712,15 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
   try {
     const payload = { ...body };
     delete payload.timeoutMs;
-    const requestUrl = buildCompletionsEndpoint(aiConfig.baseUrl);
-    const requestHost = new URL(requestUrl).hostname;
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= CONNECT_RETRY_ATTEMPTS; attempt += 1) {
-      try {
-        return await postJsonWithAgent(
-          requestUrl,
-          {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${aiConfig.apiKey}`,
-          },
-          JSON.stringify(payload),
-          timeoutMs,
-        );
-      } catch (error) {
-        if (!(error instanceof Error) || !error.message.startsWith('connect_timeout:')) {
-          throw error;
-        }
-        lastError = error;
-        clearPreferredAddress(requestHost);
-      }
-    }
-
-    throw lastError ?? new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`);
+    return await postJsonWithAgent(
+      buildCompletionsEndpoint(aiConfig.baseUrl),
+      {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${aiConfig.apiKey}`,
+      },
+      JSON.stringify(payload),
+      timeoutMs,
+    );
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('response_timeout:')) {
       throw new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });

@@ -28,6 +28,7 @@ function isReasoningModel(modelName: string): boolean {
 
   return normalized.includes('reasoner')
     || normalized.includes('reasoning')
+    || normalized.startsWith('gpt-5')
     || normalized === 'o1'
     || normalized.startsWith('o1-')
     || normalized === 'o3'

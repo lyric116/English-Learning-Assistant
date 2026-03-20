@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { parseJsonResponse } from '../utils/json-parser';
 import {
   buildExtractWordsPrompt,
@@ -73,6 +74,9 @@ interface RequestOptions {
 }
 
 const providerQuotaState = new Map<string, ProviderQuotaState>();
+const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
+const inflightRequestCache = new Map<string, Promise<string>>();
+const REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const JSON_ONLY_SYSTEM_PROMPT = [
   '你是英语学习助手。',
   '必须只返回合法 JSON。',
@@ -222,6 +226,111 @@ function reserveQuota(provider: ProviderCandidate): boolean {
   state.count += 1;
   providerQuotaState.set(key, state);
   return true;
+}
+
+function normalizeModelName(modelName: string): string {
+  return modelName.trim().toLowerCase();
+}
+
+function isSlowReasoningModel(modelName: string): boolean {
+  const normalized = normalizeModelName(modelName);
+  if (!normalized) return false;
+
+  return normalized.includes('reasoner')
+    || normalized.includes('reasoning')
+    || normalized.includes('thinking')
+    || normalized.startsWith('gpt-5')
+    || normalized === 'o1'
+    || normalized.startsWith('o1-')
+    || normalized === 'o3'
+    || normalized.startsWith('o3-')
+    || normalized.includes('r1');
+}
+
+function pickTimeoutMs(action: string, modelName: string): number {
+  const slowModel = isSlowReasoningModel(modelName);
+
+  switch (action) {
+    case 'connection_test':
+      return slowModel ? 40_000 : 15_000;
+    case 'extract_words':
+      return slowModel ? 90_000 : 45_000;
+    case 'analyze_sentence':
+      return slowModel ? 210_000 : 55_000;
+    case 'generate_reading':
+      return slowModel ? 210_000 : 60_000;
+    case 'generate_reading_questions':
+    case 'generate_vocabulary_questions':
+      return slowModel ? 90_000 : 45_000;
+    case 'generate_learning_report':
+      return slowModel ? 120_000 : 60_000;
+    default:
+      return config.ai.requestTimeoutMs;
+  }
+}
+
+function buildRequestCacheKey(provider: ProviderCandidate, action: string, prompt: string, maxTokens: number): string {
+  const promptHash = createHash('sha1').update(prompt).digest('hex');
+  return [
+    provider.source,
+    provider.name,
+    readHost(provider.baseUrl),
+    provider.model,
+    action,
+    String(maxTokens),
+    promptHash,
+  ].join(':');
+}
+
+function readCachedContent(cacheKey: string): string | undefined {
+  const hit = completedRequestCache.get(cacheKey);
+  if (!hit) return undefined;
+
+  if (Date.now() >= hit.expiresAt) {
+    completedRequestCache.delete(cacheKey);
+    return undefined;
+  }
+
+  return hit.content;
+}
+
+function writeCachedContent(cacheKey: string, content: string): void {
+  completedRequestCache.set(cacheKey, {
+    content,
+    expiresAt: Date.now() + REQUEST_CACHE_TTL_MS,
+  });
+}
+
+function describeErrorCause(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+
+  const cause = (error as Error & {
+    cause?: unknown;
+  }).cause;
+
+  if (!cause) return undefined;
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+
+  if (typeof cause === 'object') {
+    const code = typeof (cause as { code?: unknown }).code === 'string'
+      ? (cause as { code: string }).code
+      : undefined;
+    const message = typeof (cause as { message?: unknown }).message === 'string'
+      ? (cause as { message: string }).message
+      : undefined;
+
+    if (code && message) return `${code}: ${message}`;
+    if (code) return code;
+    if (message) return message;
+  }
+
+  if (typeof cause === 'string') {
+    return cause;
+  }
+
+  return undefined;
 }
 
 function isRetryableStatusCode(statusCode: number): boolean {
@@ -430,7 +539,9 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
       throw new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
     }
     const fallback = err instanceof Error ? err.message : '未知网络错误';
-    throw new AIRequestError(`AI 请求失败: ${sanitizeErrorText(fallback)}`, { retryable: true });
+    const cause = describeErrorCause(err);
+    const detail = cause ? `${fallback} | ${cause}` : fallback;
+    throw new AIRequestError(`AI 请求失败: ${sanitizeErrorText(detail)}`, { retryable: true });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -443,81 +554,126 @@ async function sendRequest(prompt: string, options: RequestOptions, aiConfig?: A
     { role: 'user', content: prompt },
   ];
   const maxTokens = options.maxTokens ?? 2000;
-  const timeoutMs = options.timeoutMs ?? config.ai.requestTimeoutMs;
+  const timeoutMs = options.timeoutMs ?? pickTimeoutMs(options.action, aiConfig.model);
   const promptChars = messages.reduce((total, item) => total + item.content.length, 0);
 
   return withProviderFallback(aiConfig, options.action, async provider => {
-    const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
-    let res: Response;
-
-    logger.info('ai.request.started', {
-      action: options.action,
-      providerHost,
-      provider: provider.name,
-      source: provider.source,
-      model: provider.model,
-      promptChars,
-      maxTokens,
-      timeoutMs,
-    });
-
-    try {
-      res = await postChatCompletions(provider, {
-        model: provider.model,
-        messages,
-        temperature: options.temperature ?? 0.3,
-        max_tokens: maxTokens,
-        timeoutMs,
-      });
-    } catch (error) {
-      const requestError = toRequestError(error);
-      logger.error('ai.request.failed', {
+    const modelProfile = isSlowReasoningModel(provider.model) ? 'slow_reasoning' : 'standard';
+    const cacheKey = buildRequestCacheKey(provider, options.action, prompt, maxTokens);
+    const cachedContent = readCachedContent(cacheKey);
+    if (cachedContent) {
+      logger.info('ai.request.cache_hit', {
         action: options.action,
         providerHost,
         provider: provider.name,
         source: provider.source,
         model: provider.model,
-        durationMs: Date.now() - startedAt,
-        retryable: requestError.retryable,
-        statusCode: requestError.statusCode,
-        error: sanitizeErrorText(requestError.message),
+        modelProfile,
       });
-      throw requestError;
+      return cachedContent;
     }
 
-    logger.info('ai.request.completed', {
-      action: options.action,
-      providerHost,
-      provider: provider.name,
-      source: provider.source,
-      model: provider.model,
-      statusCode: res.status,
-      ok: res.ok,
-      durationMs: Date.now() - startedAt,
-    });
-
-    if (!res.ok) {
-      const errBody = await safeReadJson<ErrorBody>(res);
-      const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
-      const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
-      throw new AIRequestError(
-        `AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`,
-        { retryable: isRetryableStatusCode(res.status), statusCode: res.status },
-      );
+    const inflightRequest = inflightRequestCache.get(cacheKey);
+    if (inflightRequest) {
+      logger.info('ai.request.inflight_reused', {
+        action: options.action,
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        modelProfile,
+      });
+      return inflightRequest;
     }
 
-    const dataResult = await safeReadJson<ChatCompletionResponse>(res);
-    if (!dataResult.ok || !dataResult.data) {
-      throw new AIRequestError('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
-    }
+    const requestPromise = (async () => {
+      const startedAt = Date.now();
+      let res: Response;
 
-    const data = dataResult.data;
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new AIRequestError('AI 返回内容为空，请稍后重试', { retryable: true });
+      logger.info('ai.request.started', {
+        action: options.action,
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        modelProfile,
+        promptChars,
+        maxTokens,
+        timeoutMs,
+      });
+
+      try {
+        res = await postChatCompletions(provider, {
+          model: provider.model,
+          messages,
+          temperature: options.temperature ?? 0.3,
+          max_tokens: maxTokens,
+          timeoutMs,
+        });
+      } catch (error) {
+        const requestError = toRequestError(error);
+        logger.error('ai.request.failed', {
+          action: options.action,
+          providerHost,
+          provider: provider.name,
+          source: provider.source,
+          model: provider.model,
+          modelProfile,
+          durationMs: Date.now() - startedAt,
+          retryable: requestError.retryable,
+          statusCode: requestError.statusCode,
+          error: sanitizeErrorText(requestError.message),
+        });
+        throw requestError;
+      }
+
+      logger.info('ai.request.completed', {
+        action: options.action,
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        modelProfile,
+        statusCode: res.status,
+        ok: res.ok,
+        durationMs: Date.now() - startedAt,
+        promptChars,
+        maxTokens,
+        timeoutMs,
+      });
+
+      if (!res.ok) {
+        const errBody = await safeReadJson<ErrorBody>(res);
+        const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
+        const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
+        throw new AIRequestError(
+          `AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`,
+          { retryable: isRetryableStatusCode(res.status), statusCode: res.status },
+        );
+      }
+
+      const dataResult = await safeReadJson<ChatCompletionResponse>(res);
+      if (!dataResult.ok || !dataResult.data) {
+        throw new AIRequestError('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
+      }
+
+      const data = dataResult.data;
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new AIRequestError('AI 返回内容为空，请稍后重试', { retryable: true });
+      }
+
+      writeCachedContent(cacheKey, content);
+      return content;
+    })();
+
+    inflightRequestCache.set(cacheKey, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      inflightRequestCache.delete(cacheKey);
     }
-    return content;
   });
 }
 
@@ -527,7 +683,6 @@ export async function extractWords(text: string, maxWords = 10, level = 'all', a
     action: 'extract_words',
     temperature: 0.2,
     maxTokens: estimateFlashcardsMaxTokens(maxWords),
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 45_000),
   }, aiConfig);
   return parseJsonResponse(content);
 }
@@ -538,7 +693,6 @@ export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
     action: 'analyze_sentence',
     temperature: 0.2,
     maxTokens: estimateSentenceMaxTokens(sentence),
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 55_000),
   }, aiConfig);
   return parseJsonResponse(content);
 }
@@ -550,7 +704,6 @@ export async function generateReadingContent(text: string, options?: Partial<Rea
     action: 'generate_reading',
     temperature: 0.2,
     maxTokens: estimateReadingMaxTokens(text, normalizedOptions.language),
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 60_000),
   }, aiConfig);
   const result = parseJsonResponse(content);
   return normalizeReadingResponse(result);
@@ -563,7 +716,6 @@ export async function generateReadingQuestions(reading: string, options?: Partia
     action: 'generate_reading_questions',
     temperature: 0.2,
     maxTokens: 1100,
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 45_000),
   }, aiConfig);
   return parseJsonResponse(content);
 }
@@ -575,7 +727,6 @@ export async function generateVocabularyQuestions(vocabulary: unknown[], options
     action: 'generate_vocabulary_questions',
     temperature: 0.2,
     maxTokens: 1100,
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 45_000),
   }, aiConfig);
   return parseJsonResponse(content);
 }
@@ -586,7 +737,6 @@ export async function generateLearningReport(reportType: string, learningData: u
     action: 'generate_learning_report',
     temperature: 0.3,
     maxTokens: 1400,
-    timeoutMs: Math.min(config.ai.requestTimeoutMs, 60_000),
   }, aiConfig);
   return parseJsonResponse(content);
 }
@@ -606,7 +756,7 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
           { role: 'user', content: 'Hi' },
         ],
         max_tokens: 5,
-        timeoutMs: Math.min(config.ai.requestTimeoutMs, 15_000),
+        timeoutMs: pickTimeoutMs('connection_test', provider.model),
       });
     } catch (error) {
       const requestError = toRequestError(error);

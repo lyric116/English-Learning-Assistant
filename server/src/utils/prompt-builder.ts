@@ -43,7 +43,79 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
 ${text}`;
 }
 
-export function buildAnalyzeSentencePrompt(sentence: string): string {
+export function buildAnalyzeSentencePrompt(sentence: string, options?: { compact?: boolean }): string {
+  if (options?.compact) {
+    return `你是英语语法分析助手。请快速输出核心分析，只返回合法 JSON。
+
+硬性限制：
+- clauses 最多 4 条
+- tense 最多 2 条
+- components 最多 5 条
+- words 最多 8 条，只保留最关键的实词/语法词
+- phrases 最多 4 条
+- grammarPoints 最多 3 条，tags 每项最多 2 个
+- 所有 explanation / meaning / role / function 都尽量短，避免重复原句
+- 没有内容就返回空数组
+- 不要 Markdown，不要额外说明
+
+返回格式：
+{
+  "structure": {
+    "type": "句型",
+    "explanation": "结构说明",
+    "pattern": "句型公式"
+  },
+  "clauses": [
+    {
+      "text": "片段",
+      "type": "类型",
+      "function": "功能",
+      "connector": "连接词"
+    }
+  ],
+  "tense": [
+    {
+      "name": "时态",
+      "explanation": "说明"
+    }
+  ],
+  "components": [
+    {
+      "text": "成分",
+      "type": "类型",
+      "explanation": "说明"
+    }
+  ],
+  "words": [
+    {
+      "text": "词",
+      "lemma": "原形",
+      "partOfSpeech": "词性",
+      "meaning": "含义",
+      "role": "作用"
+    }
+  ],
+  "phrases": [
+    {
+      "text": "短语",
+      "category": "类别",
+      "function": "作用",
+      "explanation": "说明"
+    }
+  ],
+  "grammarPoints": [
+    {
+      "title": "语法点",
+      "explanation": "说明",
+      "tags": ["标签1", "标签2"]
+    }
+  ]
+}
+
+句子：
+${sentence}`;
+  }
+
   return `你是英语语法分析助手。请对下面句子做准确、精炼的语法分析，并只返回合法 JSON。
 
 分析要求：

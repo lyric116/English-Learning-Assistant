@@ -879,11 +879,12 @@ export async function extractWords(text: string, maxWords = 10, level = 'all', a
 }
 
 export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
-  const prompt = buildAnalyzeSentencePrompt(sentence);
+  const compactMode = isSlowReasoningModel(aiConfig?.model ?? '');
+  const prompt = buildAnalyzeSentencePrompt(sentence, compactMode ? { compact: true } : undefined);
   const content = await sendRequest(prompt, {
     action: 'analyze_sentence',
-    temperature: 0.2,
-    maxTokens: estimateSentenceMaxTokens(sentence),
+    temperature: compactMode ? 0 : 0.2,
+    maxTokens: compactMode ? 850 : estimateSentenceMaxTokens(sentence),
   }, aiConfig);
   return parseJsonResponse(content);
 }

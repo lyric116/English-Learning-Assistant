@@ -76,6 +76,14 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
+interface AgentRequestOptions {
+  urlString: string;
+  method: 'GET' | 'POST';
+  headers: Record<string, string>;
+  body?: string;
+  timeoutMs: number;
+}
+
 const providerQuotaState = new Map<string, ProviderQuotaState>();
 const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
 const inflightRequestCache = new Map<string, Promise<string>>();
@@ -209,6 +217,17 @@ function buildCompletionsEndpoint(baseUrl: string): string {
   return normalized.endsWith('/chat/completions')
     ? normalized
     : `${normalized}/chat/completions`;
+}
+
+function buildModelsEndpoint(baseUrl: string): string {
+  const normalized = baseUrl.replace(/\/+$/, '');
+  if (normalized.endsWith('/models')) {
+    return normalized;
+  }
+  if (normalized.endsWith('/chat/completions')) {
+    return `${normalized.slice(0, -'/chat/completions'.length)}/models`;
+  }
+  return `${normalized}/models`;
 }
 
 function readHost(baseUrl: string): string {
@@ -438,7 +457,17 @@ function buildHostHeader(url: URL): string {
 }
 
 async function postJsonWithAgent(urlString: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<Response> {
-  const url = new URL(urlString);
+  return requestWithAgent({
+    urlString,
+    method: 'POST',
+    headers,
+    body,
+    timeoutMs,
+  });
+}
+
+async function requestWithAgent(options: AgentRequestOptions): Promise<Response> {
+  const url = new URL(options.urlString);
   const isHttps = url.protocol === 'https:';
   const client = isHttps ? https : http;
   const agent = isHttps ? httpsAgent : httpAgent;
@@ -454,12 +483,12 @@ async function postJsonWithAgent(urlString: string, headers: Record<string, stri
           servername: isHttps ? url.hostname : undefined,
           port: url.port || (isHttps ? 443 : 80),
           path: `${url.pathname}${url.search}`,
-          method: 'POST',
+          method: options.method,
           agent,
           headers: {
             Host: buildHostHeader(url),
-            ...headers,
-            'Content-Length': Buffer.byteLength(body).toString(),
+            ...options.headers,
+            ...(options.body ? { 'Content-Length': Buffer.byteLength(options.body).toString() } : {}),
           },
         }, res => {
           const chunks: Buffer[] = [];
@@ -481,8 +510,8 @@ async function postJsonWithAgent(urlString: string, headers: Record<string, stri
         });
 
         const overallTimer = setTimeout(() => {
-          req.destroy(new Error(`response_timeout:${timeoutMs}`));
-        }, timeoutMs);
+          req.destroy(new Error(`response_timeout:${options.timeoutMs}`));
+        }, options.timeoutMs);
 
         req.on('socket', socket => {
           socket.setKeepAlive(true);
@@ -506,7 +535,9 @@ async function postJsonWithAgent(urlString: string, headers: Record<string, stri
           reject(error);
         });
 
-        req.write(body);
+        if (options.body) {
+          req.write(options.body);
+        }
         req.end();
       });
     } catch (error) {
@@ -938,18 +969,33 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
   return withProviderFallback(aiConfig, 'connection_test', async provider => {
     const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
+    const timeoutMs = pickTimeoutMs('connection_test', provider.model);
     let res: Response;
+    let strategy: 'models' | 'chat_completion' = 'models';
 
     try {
-      res = await postChatCompletions(provider, {
-        model: provider.model,
-        messages: [
-          { role: 'system', content: JSON_ONLY_SYSTEM_PROMPT },
-          { role: 'user', content: 'Hi' },
-        ],
-        max_tokens: 5,
-        timeoutMs: pickTimeoutMs('connection_test', provider.model),
+      res = await requestWithAgent({
+        urlString: buildModelsEndpoint(provider.baseUrl),
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${provider.apiKey}`,
+        },
+        timeoutMs: Math.min(timeoutMs, 20_000),
       });
+
+      if (!res.ok && [404, 405, 501].includes(res.status)) {
+        strategy = 'chat_completion';
+        res = await postChatCompletions(provider, {
+          model: provider.model,
+          messages: [
+            { role: 'system', content: JSON_ONLY_SYSTEM_PROMPT },
+            { role: 'user', content: 'Hi' },
+          ],
+          max_tokens: 5,
+          timeoutMs,
+        });
+      }
     } catch (error) {
       const requestError = toRequestError(error);
       logger.error('ai.connection.failed', {
@@ -958,6 +1004,7 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
         source: provider.source,
         model: provider.model,
         durationMs: Date.now() - startedAt,
+        strategy,
         retryable: requestError.retryable,
         statusCode: requestError.statusCode,
         error: sanitizeErrorText(requestError.message),
@@ -970,6 +1017,7 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
       provider: provider.name,
       source: provider.source,
       model: provider.model,
+      strategy,
       statusCode: res.status,
       ok: res.ok,
       durationMs: Date.now() - startedAt,

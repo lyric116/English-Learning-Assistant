@@ -1,4 +1,6 @@
 import { createHash } from 'crypto';
+import http from 'http';
+import https from 'https';
 import { parseJsonResponse } from '../utils/json-parser';
 import {
   buildExtractWordsPrompt,
@@ -77,6 +79,15 @@ const providerQuotaState = new Map<string, ProviderQuotaState>();
 const completedRequestCache = new Map<string, { content: string; expiresAt: number }>();
 const inflightRequestCache = new Map<string, Promise<string>>();
 const REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
+const CONNECT_TIMEOUT_MS = 25_000;
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 32,
+});
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 32,
+});
 const JSON_ONLY_SYSTEM_PROMPT = [
   '你是英语学习助手。',
   '必须只返回合法 JSON。',
@@ -333,6 +344,80 @@ function describeErrorCause(error: unknown): string | undefined {
   return undefined;
 }
 
+function makeHttpResponse(status: number, statusText: string, body: string): Response {
+  return new Response(body, {
+    status,
+    statusText,
+    headers: {
+      'content-type': 'application/json',
+    },
+  });
+}
+
+async function postJsonWithAgent(urlString: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<Response> {
+  const url = new URL(urlString);
+  const isHttps = url.protocol === 'https:';
+  const client = isHttps ? https : http;
+  const agent = isHttps ? httpsAgent : httpAgent;
+
+  return new Promise((resolve, reject) => {
+    const req = client.request({
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || (isHttps ? 443 : 80),
+      path: `${url.pathname}${url.search}`,
+      method: 'POST',
+      agent,
+      headers: {
+        ...headers,
+        'Content-Length': Buffer.byteLength(body).toString(),
+      },
+    }, res => {
+      const chunks: Buffer[] = [];
+
+      res.on('data', chunk => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+
+      res.on('end', () => {
+        clearTimeout(overallTimer);
+        const responseBody = Buffer.concat(chunks).toString('utf8');
+        resolve(makeHttpResponse(
+          res.statusCode || 500,
+          res.statusMessage || 'Unknown Status',
+          responseBody,
+        ));
+      });
+    });
+
+    const overallTimer = setTimeout(() => {
+      req.destroy(new Error(`response_timeout:${timeoutMs}`));
+    }, timeoutMs);
+
+    req.on('socket', socket => {
+      socket.setKeepAlive(true);
+
+      if (socket.connecting) {
+        socket.setTimeout(CONNECT_TIMEOUT_MS);
+        socket.once('connect', () => {
+          socket.setTimeout(0);
+        });
+        socket.once('timeout', () => {
+          req.destroy(new Error(`connect_timeout:${CONNECT_TIMEOUT_MS}`));
+        });
+      }
+    });
+
+    req.on('error', error => {
+      clearTimeout(overallTimer);
+      reject(error);
+    });
+
+    req.write(body);
+    req.end();
+  });
+}
+
 function isRetryableStatusCode(statusCode: number): boolean {
   return statusCode === 408
     || statusCode === 409
@@ -516,34 +601,33 @@ function normalizeReadingResponse(payload: unknown) {
 }
 
 async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unknown>): Promise<Response> {
-  const controller = new AbortController();
   const timeoutMs = typeof body.timeoutMs === 'number'
     ? body.timeoutMs
     : config.ai.requestTimeoutMs;
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const payload = { ...body };
     delete payload.timeoutMs;
-    return await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
-      method: 'POST',
-      headers: {
+    return await postJsonWithAgent(
+      buildCompletionsEndpoint(aiConfig.baseUrl),
+      {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${aiConfig.apiKey}`,
       },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+      JSON.stringify(payload),
+      timeoutMs,
+    );
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
+    if (err instanceof Error && err.message.startsWith('response_timeout:')) {
       throw new AIRequestError(`AI 请求超时（>${Math.floor(timeoutMs / 1000)}s）`, { retryable: true });
+    }
+    if (err instanceof Error && err.message.startsWith('connect_timeout:')) {
+      throw new AIRequestError(`AI 连接超时（>${Math.floor(CONNECT_TIMEOUT_MS / 1000)}s）`, { retryable: true });
     }
     const fallback = err instanceof Error ? err.message : '未知网络错误';
     const cause = describeErrorCause(err);
     const detail = cause ? `${fallback} | ${cause}` : fallback;
     throw new AIRequestError(`AI 请求失败: ${sanitizeErrorText(detail)}`, { retryable: true });
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 

@@ -4,7 +4,7 @@ import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage.ts';
 import { getAnonymousSessionId } from './session.ts';
 
 const API_BASE = '/api/v1';
-const REQUEST_TIMEOUT_MS = 95_000;
+const REQUEST_TIMEOUT_MS = 55_000;
 type FlashcardLevel = 'all' | 'cet4' | 'cet6' | 'advanced';
 type ReadingLanguage = 'en' | 'zh';
 type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';

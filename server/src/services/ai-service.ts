@@ -6,12 +6,13 @@ import {
   buildReadingQuestionsPrompt,
   buildVocabularyQuestionsPrompt,
   buildLearningReportPrompt,
+  summarizeLearningDataForReport,
 } from '../utils/prompt-builder';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
 interface ChatCompletionResponse {
-  choices: Array<{ message: { content: string } }>;
+  choices: Array<{ message: { content: string }; finish_reason?: string | null }>;
 }
 
 interface AIConfig {
@@ -42,6 +43,7 @@ interface SafeJsonResult<T = unknown> {
   ok: boolean;
   data?: T;
   rawText?: string;
+  textLength: number;
 }
 
 interface ProviderCandidate extends AIConfig {
@@ -55,7 +57,20 @@ interface ProviderQuotaState {
   count: number;
 }
 
+interface ProviderAttemptContext {
+  attempt: number;
+  totalCandidates: number;
+  remainingMs: number;
+  timeoutMs: number;
+}
+
 const providerQuotaState = new Map<string, ProviderQuotaState>();
+const MIN_PROVIDER_ATTEMPT_TIMEOUT_MS = 8_000;
+const MIN_FLASHCARDS_MAX_TOKENS = 700;
+const MAX_FLASHCARDS_MAX_TOKENS = 1_400;
+const SENTENCE_ANALYZE_MAX_TOKENS = 1_600;
+const MAX_QUIZ_READING_PROMPT_CHARS = 6_000;
+const MAX_QUIZ_VOCAB_PROMPT_ITEMS = 80;
 
 function isPrivateOrLocalhost(hostname: string): boolean {
   const host = hostname.toLowerCase();
@@ -99,12 +114,12 @@ function getErrorMessageFromBody(body: unknown): string | undefined {
 
 async function safeReadJson<T = unknown>(res: Response): Promise<SafeJsonResult<T>> {
   const text = await res.text();
-  if (!text) return { ok: false, rawText: '' };
+  if (!text) return { ok: false, rawText: '', textLength: 0 };
 
   try {
-    return { ok: true, data: JSON.parse(text) as T };
+    return { ok: true, data: JSON.parse(text) as T, textLength: text.length };
   } catch {
-    return { ok: false, rawText: text };
+    return { ok: false, rawText: text, textLength: text.length };
   }
 }
 
@@ -159,6 +174,48 @@ function readHost(baseUrl: string): string {
   }
 }
 
+function estimateByteLength(value: unknown): number {
+  try {
+    return Buffer.byteLength(typeof value === 'string' ? value : JSON.stringify(value), 'utf8');
+  } catch {
+    return 0;
+  }
+}
+
+function estimateCharLength(value: unknown): number {
+  try {
+    return (typeof value === 'string' ? value : JSON.stringify(value)).length;
+  } catch {
+    return 0;
+  }
+}
+
+function shouldDisableThinking(model: string): boolean {
+  return /^glm-4\.(5|7)/i.test(model);
+}
+
+function buildChatCompletionBody(
+  provider: AIConfig,
+  prompt: string,
+  options: { temperature?: number; maxTokens?: number; extraBody?: Record<string, unknown> },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: provider.model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 2000,
+  };
+
+  if (shouldDisableThinking(provider.model)) {
+    body.thinking = { type: 'disabled' };
+  }
+
+  if (options.extraBody) {
+    Object.assign(body, options.extraBody);
+  }
+  return body;
+}
+
 function currentDateKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -184,6 +241,64 @@ function reserveQuota(provider: ProviderCandidate): boolean {
   state.count += 1;
   providerQuotaState.set(key, state);
   return true;
+}
+
+function pickAttemptTimeoutMs(remainingMs: number, providersLeft: number): number {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
+  const fairShare = Math.floor(remainingMs / Math.max(1, providersLeft));
+  const planned = Math.max(MIN_PROVIDER_ATTEMPT_TIMEOUT_MS, fairShare);
+  return Math.min(remainingMs, planned);
+}
+
+function normalizePromptText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function clipPromptText(text: string, maxChars: number): string {
+  const normalized = normalizePromptText(text);
+  if (normalized.length <= maxChars) return normalized;
+
+  const marker = '\n...[内容已截断]...\n';
+  const headLength = Math.floor((maxChars - marker.length) * 0.75);
+  const tailLength = Math.max(0, maxChars - marker.length - headLength);
+  return `${normalized.slice(0, headLength)}${marker}${normalized.slice(-tailLength)}`;
+}
+
+function compactVocabularyForPrompt(vocabulary: unknown[]): Array<Record<string, string>> {
+  return vocabulary
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item))
+    .map(item => ({
+      word: typeof item.word === 'string' ? item.word.trim() : '',
+      meaning: typeof item.meaning === 'string' ? item.meaning.trim() : '',
+      phonetic: typeof item.phonetic === 'string' ? item.phonetic.trim() : '',
+      example: typeof item.example === 'string' ? item.example.trim() : '',
+    }))
+    .filter(item => item.word || item.meaning)
+    .slice(0, MAX_QUIZ_VOCAB_PROMPT_ITEMS);
+}
+
+function resolveQuizMaxTokens(questionCount: number): number {
+  return Math.min(1_200, Math.max(500, questionCount * 120));
+}
+
+function resolveFlashcardsMaxTokens(maxWords: number): number {
+  return Math.min(MAX_FLASHCARDS_MAX_TOKENS, Math.max(MIN_FLASHCARDS_MAX_TOKENS, maxWords * 130));
+}
+
+function isLikelyTruncatedStructuredContent(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) return false;
+  if (!trimmed.endsWith('}') && !trimmed.endsWith(']')) return true;
+
+  const openBraces = (trimmed.match(/{/g) || []).length;
+  const closeBraces = (trimmed.match(/}/g) || []).length;
+  const openBrackets = (trimmed.match(/\[/g) || []).length;
+  const closeBrackets = (trimmed.match(/]/g) || []).length;
+  return openBraces !== closeBraces || openBrackets !== closeBrackets;
 }
 
 function buildProviderCandidates(primary: AIConfig): ProviderCandidate[] {
@@ -221,13 +336,27 @@ function buildProviderCandidates(primary: AIConfig): ProviderCandidate[] {
 async function withProviderFallback<T>(
   primary: AIConfig,
   action: string,
-  runner: (provider: ProviderCandidate) => Promise<T>,
+  runner: (provider: ProviderCandidate, context: ProviderAttemptContext) => Promise<T>,
+  totalBudgetMs = config.ai.requestTimeoutMs,
 ): Promise<T> {
   const candidates = buildProviderCandidates(primary);
   let lastError: Error | undefined;
   let attempted = 0;
+  const deadlineAt = Date.now() + Math.max(1, totalBudgetMs);
+  let timedOut = false;
 
-  for (const provider of candidates) {
+  for (const [index, provider] of candidates.entries()) {
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      timedOut = true;
+      logger.warn('ai.provider.deadline.exhausted', {
+        action,
+        attempted,
+        totalBudgetMs,
+      });
+      break;
+    }
+
     if (!reserveQuota(provider)) {
       logger.warn('ai.provider.quota.exhausted', {
         action,
@@ -241,17 +370,26 @@ async function withProviderFallback<T>(
     }
 
     attempted += 1;
+    const timeoutMs = pickAttemptTimeoutMs(remainingMs, candidates.length - index);
     if (provider.source === 'fallback') {
       logger.warn('ai.provider.fallback.activated', {
         action,
         provider: provider.name,
         providerHost: readHost(provider.baseUrl),
         model: provider.model,
+        attempt: attempted,
+        timeoutMs,
+        remainingMs,
       });
     }
 
     try {
-      return await runner(provider);
+      return await runner(provider, {
+        attempt: attempted,
+        totalCandidates: candidates.length,
+        remainingMs,
+        timeoutMs,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -261,9 +399,16 @@ async function withProviderFallback<T>(
         source: provider.source,
         providerHost: readHost(provider.baseUrl),
         model: provider.model,
+        attempt: attempted,
+        timeoutMs,
+        remainingMs,
         error: sanitizeErrorText(message),
       });
     }
+  }
+
+  if (timedOut) {
+    throw new Error(`AI 请求超时（>${Math.floor(totalBudgetMs / 1000)}s）`);
   }
 
   if (attempted === 0) {
@@ -342,9 +487,14 @@ function normalizeReadingResponse(payload: unknown) {
   };
 }
 
-async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unknown>): Promise<Response> {
+async function postChatCompletions(
+  aiConfig: AIConfig,
+  body: Record<string, unknown>,
+  timeoutMs = config.ai.requestTimeoutMs,
+): Promise<Response> {
+  const effectiveTimeoutMs = Math.max(1_000, timeoutMs);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), config.ai.requestTimeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
   try {
     return await fetch(buildCompletionsEndpoint(aiConfig.baseUrl), {
@@ -358,7 +508,7 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`AI 请求超时（>${Math.floor(config.ai.requestTimeoutMs / 1000)}s）`);
+      throw new Error(`AI 请求超时（>${Math.floor(effectiveTimeoutMs / 1000)}s）`);
     }
     const fallback = err instanceof Error ? err.message : '未知网络错误';
     throw new Error(`AI 请求失败: ${sanitizeErrorText(fallback)}`);
@@ -367,34 +517,55 @@ async function postChatCompletions(aiConfig: AIConfig, body: Record<string, unkn
   }
 }
 
-async function sendRequest(prompt: string, options: { temperature?: number; maxTokens?: number } = {}, aiConfig?: AIConfig): Promise<string> {
+async function sendRequest(
+  action: string,
+  prompt: string,
+  options: { temperature?: number; maxTokens?: number; extraBody?: Record<string, unknown> } = {},
+  aiConfig?: AIConfig,
+): Promise<string> {
   validateAIConfig(aiConfig);
-  return withProviderFallback(aiConfig, 'chat_completion', async provider => {
+  return withProviderFallback(aiConfig, action, async (provider, attemptContext) => {
     const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
+    const body = buildChatCompletionBody(provider, prompt, options);
     let res: Response;
 
+    logger.info('ai.request.started', {
+      action,
+      providerHost,
+      provider: provider.name,
+      source: provider.source,
+      model: provider.model,
+      promptChars: prompt.length,
+      requestBytes: estimateByteLength(body),
+      temperature: options.temperature ?? 0.7,
+      maxTokens: options.maxTokens ?? 2000,
+      attempt: attemptContext.attempt,
+      attemptTotal: attemptContext.totalCandidates,
+      timeoutMs: attemptContext.timeoutMs,
+      remainingMs: attemptContext.remainingMs,
+    });
+
     try {
-      res = await postChatCompletions(provider, {
-        model: provider.model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: options.temperature ?? 0.7,
-        max_tokens: options.maxTokens ?? 2000,
-      });
+      res = await postChatCompletions(provider, body, attemptContext.timeoutMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
       logger.error('ai.request.failed', {
+        action,
         providerHost,
         provider: provider.name,
         source: provider.source,
         model: provider.model,
         durationMs: Date.now() - startedAt,
+        attempt: attemptContext.attempt,
+        timeoutMs: attemptContext.timeoutMs,
         error: sanitizeErrorText(message),
       });
       throw error;
     }
 
     logger.info('ai.request.completed', {
+      action,
       providerHost,
       provider: provider.name,
       source: provider.source,
@@ -402,22 +573,58 @@ async function sendRequest(prompt: string, options: { temperature?: number; maxT
       statusCode: res.status,
       ok: res.ok,
       durationMs: Date.now() - startedAt,
+      attempt: attemptContext.attempt,
+      timeoutMs: attemptContext.timeoutMs,
     });
 
     if (!res.ok) {
       const errBody = await safeReadJson<ErrorBody>(res);
+      logger.info('ai.response.body.completed', {
+        action,
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        responseChars: errBody.textLength,
+        totalDurationMs: Date.now() - startedAt,
+      });
       const snippet = errBody.rawText ? sanitizeErrorText(errBody.rawText.slice(0, 120)) : '';
       const upstreamMessage = getErrorMessageFromBody(errBody.data) || snippet || res.statusText || '未知上游错误';
       throw new Error(`AI 上游服务错误（${res.status}）: ${sanitizeErrorText(upstreamMessage)}`);
     }
 
+    const bodyStartedAt = Date.now();
     const dataResult = await safeReadJson<ChatCompletionResponse>(res);
+    logger.info('ai.response.body.completed', {
+      action,
+      providerHost,
+      provider: provider.name,
+      source: provider.source,
+      model: provider.model,
+      responseChars: dataResult.textLength,
+      bodyReadMs: Date.now() - bodyStartedAt,
+      totalDurationMs: Date.now() - startedAt,
+    });
     if (!dataResult.ok || !dataResult.data) {
       throw new Error('AI 上游返回非 JSON 内容，请检查 Base URL 或模型服务状态');
     }
 
     const data = dataResult.data;
+    const finishReason = data.choices?.[0]?.finish_reason;
+    if (finishReason) {
+      logger.info('ai.response.choice.completed', {
+        action,
+        providerHost,
+        provider: provider.name,
+        source: provider.source,
+        model: provider.model,
+        finishReason,
+      });
+    }
     const content = data.choices?.[0]?.message?.content;
+    if (finishReason === 'length' && (!content || !String(content).trim())) {
+      throw new Error('AI 上游输出被截断（finish_reason=length），请减少输出量或更换模型');
+    }
     if (!content) {
       throw new Error('AI 返回内容为空，请稍后重试');
     }
@@ -425,59 +632,101 @@ async function sendRequest(prompt: string, options: { temperature?: number; maxT
   });
 }
 
+function parseStructuredContent<T>(action: string, content: string): T {
+  try {
+    return parseJsonResponse<T>(content);
+  } catch (error) {
+    logger.warn('ai.response.parse_failed', {
+      action,
+      contentChars: content.length,
+      contentSnippet: sanitizeErrorText(content.slice(0, 240)),
+    });
+    if (isLikelyTruncatedStructuredContent(content)) {
+      throw new Error('AI 上游输出被截断（JSON 未完成），请减少输出量或更换模型');
+    }
+    throw error;
+  }
+}
+
 export async function extractWords(text: string, maxWords = 10, level = 'all', aiConfig?: AIConfig) {
-  const prompt = buildExtractWordsPrompt(text, maxWords, level);
-  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1000 }, aiConfig);
-  return parseJsonResponse(content);
+  const prompt = buildExtractWordsPrompt(normalizePromptText(text), maxWords, level);
+  const content = await sendRequest(
+    'flashcards_extract',
+    prompt,
+    { temperature: 0.3, maxTokens: resolveFlashcardsMaxTokens(maxWords) },
+    aiConfig,
+  );
+  return parseStructuredContent('flashcards_extract', content);
 }
 
 export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
-  const prompt = buildAnalyzeSentencePrompt(sentence);
-  const content = await sendRequest(prompt, { temperature: 0.6, maxTokens: 2000 }, aiConfig);
-  return parseJsonResponse(content);
+  const prompt = buildAnalyzeSentencePrompt(normalizePromptText(sentence));
+  const content = await sendRequest(
+    'sentence_analyze',
+    prompt,
+    { temperature: 0.2, maxTokens: SENTENCE_ANALYZE_MAX_TOKENS },
+    aiConfig,
+  );
+  return parseStructuredContent('sentence_analyze', content);
 }
 
 export async function generateReadingContent(text: string, options?: Partial<ReadingGenerateOptions>, aiConfig?: AIConfig) {
   const normalizedOptions = normalizeReadingOptions(options);
-  const prompt = buildReadingContentPrompt(text, normalizedOptions);
-  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 2000 }, aiConfig);
-  const result = parseJsonResponse(content);
+  const prompt = buildReadingContentPrompt(normalizePromptText(text), normalizedOptions);
+  const content = await sendRequest('reading_generate', prompt, { temperature: 0.7, maxTokens: 1_200 }, aiConfig);
+  const result = parseStructuredContent('reading_generate', content);
   return normalizeReadingResponse(result);
 }
 
 export async function generateReadingQuestions(reading: string, options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
   const normalizedOptions = normalizeQuizOptions(options);
-  const prompt = buildReadingQuestionsPrompt(reading, normalizedOptions);
-  const content = await sendRequest(prompt, { temperature: 0.6, maxTokens: 1500 }, aiConfig);
-  return parseJsonResponse(content);
+  const clippedReading = clipPromptText(reading, MAX_QUIZ_READING_PROMPT_CHARS);
+  const prompt = buildReadingQuestionsPrompt(clippedReading, normalizedOptions);
+  const content = await sendRequest(
+    'quiz_reading_questions',
+    prompt,
+    { temperature: 0.6, maxTokens: resolveQuizMaxTokens(normalizedOptions.questionCount) },
+    aiConfig,
+  );
+  return parseStructuredContent('quiz_reading_questions', content);
 }
 
 export async function generateVocabularyQuestions(vocabulary: unknown[], options?: Partial<QuizGenerateOptions>, aiConfig?: AIConfig) {
   const normalizedOptions = normalizeQuizOptions(options);
-  const prompt = buildVocabularyQuestionsPrompt(vocabulary, normalizedOptions);
-  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1500 }, aiConfig);
-  return parseJsonResponse(content);
+  const compactVocabulary = compactVocabularyForPrompt(vocabulary);
+  const prompt = buildVocabularyQuestionsPrompt(compactVocabulary, normalizedOptions);
+  const content = await sendRequest(
+    'quiz_vocabulary_questions',
+    prompt,
+    { temperature: 0.7, maxTokens: resolveQuizMaxTokens(normalizedOptions.questionCount) },
+    aiConfig,
+  );
+  return parseStructuredContent('quiz_vocabulary_questions', content);
 }
 
 export async function generateLearningReport(reportType: string, learningData: unknown, aiConfig?: AIConfig) {
-  const prompt = buildLearningReportPrompt(reportType, learningData);
-  const content = await sendRequest(prompt, { temperature: 0.7, maxTokens: 1500 }, aiConfig);
-  return parseJsonResponse(content);
+  const compactLearningData = summarizeLearningDataForReport(learningData);
+  logger.info('ai.report.input.compacted', {
+    rawBytes: estimateByteLength(learningData),
+    compactBytes: estimateByteLength(compactLearningData),
+    rawChars: estimateCharLength(learningData),
+    compactChars: estimateCharLength(compactLearningData),
+  });
+  const prompt = buildLearningReportPrompt(reportType, compactLearningData);
+  const content = await sendRequest('report_generate', prompt, { temperature: 0.7, maxTokens: 900 }, aiConfig);
+  return parseStructuredContent('report_generate', content);
 }
 
 export async function testConnection(aiConfig?: AIConfig): Promise<{ success: boolean; model: string }> {
   validateAIConfig(aiConfig);
-  return withProviderFallback(aiConfig, 'connection_test', async provider => {
+  return withProviderFallback(aiConfig, 'connection_test', async (provider, attemptContext) => {
     const startedAt = Date.now();
     const providerHost = readHost(provider.baseUrl);
+    const body = buildChatCompletionBody(provider, 'Hi', { maxTokens: 5 });
     let res: Response;
 
     try {
-      res = await postChatCompletions(provider, {
-        model: provider.model,
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 5,
-      });
+      res = await postChatCompletions(provider, body, attemptContext.timeoutMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误';
       logger.error('ai.connection.failed', {
@@ -486,6 +735,8 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
         source: provider.source,
         model: provider.model,
         durationMs: Date.now() - startedAt,
+        attempt: attemptContext.attempt,
+        timeoutMs: attemptContext.timeoutMs,
         error: sanitizeErrorText(message),
       });
       throw error;
@@ -499,6 +750,8 @@ export async function testConnection(aiConfig?: AIConfig): Promise<{ success: bo
       statusCode: res.status,
       ok: res.ok,
       durationMs: Date.now() - startedAt,
+      attempt: attemptContext.attempt,
+      timeoutMs: attemptContext.timeoutMs,
     });
 
     if (!res.ok) {

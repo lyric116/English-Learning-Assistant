@@ -17,7 +17,7 @@ function inferStatus(message: string): number {
   if (message.includes('请先在页面设置') || message.includes('Base URL')) return 400;
   if (message.includes('不能为空') || message.includes('必须是') || message.includes('不支持')) return 400;
   if (message.includes('超时')) return 504;
-  if (message.includes('AI 上游服务错误') || message.includes('连接失败') || message.includes('AI 请求失败')) return 502;
+  if (message.includes('AI 上游服务错误') || message.includes('AI 上游输出被截断') || message.includes('连接失败') || message.includes('AI 请求失败')) return 502;
   return 500;
 }
 

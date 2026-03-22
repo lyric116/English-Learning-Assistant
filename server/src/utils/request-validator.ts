@@ -66,10 +66,21 @@ const MAX_FLASHCARDS_TEXT_LENGTH = 8_000;
 const MIN_FLASHCARDS_WORDS = 1;
 const MAX_FLASHCARDS_WORDS = 30;
 const MAX_SENTENCE_LENGTH = 1_000;
-const MAX_READING_LENGTH = 200_000;
+const MAX_READING_SOURCE_LENGTH = 12_000;
+const MAX_READING_QUIZ_LENGTH = 16_000;
+const MAX_VOCABULARY_ITEMS = 200;
+const MAX_REPORT_PAYLOAD_BYTES = 280_000;
 const MAX_API_KEY_LENGTH = 2_048;
 const MAX_MODEL_LENGTH = 200;
 const MAX_BASE_URL_LENGTH = 500;
+
+function estimateByteLength(value: unknown): number {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  } catch {
+    return 0;
+  }
+}
 
 function ensureObject(value: unknown, fieldName = '请求体'): ObjectRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -230,7 +241,7 @@ export function validateSentenceAnalyzePayload(body: unknown): SentenceAnalyzePa
 export function validateReadingGeneratePayload(body: unknown): ReadingGeneratePayload {
   const obj = ensureObject(body);
 
-  const text = readRequiredString(obj, 'text', '文本内容', MAX_READING_LENGTH);
+  const text = readRequiredString(obj, 'text', '文本内容', MAX_READING_SOURCE_LENGTH);
   const language = readOptionalEnum(obj, 'language', 'en', '语言方向', ['en', 'zh'] as const);
   const topic = readOptionalEnum(
     obj,
@@ -261,7 +272,7 @@ export function validateReadingGeneratePayload(body: unknown): ReadingGeneratePa
 export function validateReadingQuestionsPayload(body: unknown): ReadingQuestionsPayload {
   const obj = ensureObject(body);
 
-  const reading = readRequiredString(obj, 'reading', '阅读内容', MAX_READING_LENGTH);
+  const reading = readRequiredString(obj, 'reading', '阅读内容', MAX_READING_QUIZ_LENGTH);
   const questionCount = readOptionalInteger(obj, 'questionCount', 5, '题目数量', 1, 20);
   const difficulty = readOptionalEnum(obj, 'difficulty', 'medium', '题目难度', ['easy', 'medium', 'hard'] as const);
   const timedMode = readOptionalBoolean(obj, 'timedMode', false, '限时模式');
@@ -274,7 +285,7 @@ export function validateReadingQuestionsPayload(body: unknown): ReadingQuestions
 export function validateVocabularyQuestionsPayload(body: unknown): VocabularyQuestionsPayload {
   const obj = ensureObject(body);
 
-  const vocabulary = readRequiredArray(obj, 'vocabulary', '词汇列表', 1, 500);
+  const vocabulary = readRequiredArray(obj, 'vocabulary', '词汇列表', 1, MAX_VOCABULARY_ITEMS);
   const questionCount = readOptionalInteger(obj, 'questionCount', 5, '题目数量', 1, 20);
   const difficulty = readOptionalEnum(obj, 'difficulty', 'medium', '题目难度', ['easy', 'medium', 'hard'] as const);
   const timedMode = readOptionalBoolean(obj, 'timedMode', false, '限时模式');
@@ -295,6 +306,9 @@ export function validateReportGeneratePayload(body: unknown): ReportGeneratePayl
   );
 
   const learningData = ensureObject(obj.learningData, '学习数据');
+  if (estimateByteLength(learningData) > MAX_REPORT_PAYLOAD_BYTES) {
+    throw new ValidationError(`学习数据体积过大，请缩小范围后重试（上限 ${MAX_REPORT_PAYLOAD_BYTES} bytes）`);
+  }
   const aiConfig = readOptionalAiConfig(obj);
 
   return { reportType, learningData, aiConfig };

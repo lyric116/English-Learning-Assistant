@@ -90,7 +90,7 @@ cp .env.example server/.env
 | --- | --- | --- |
 | `PORT` | `3001` | 本地 Express 端口 |
 | `NODE_ENV` | `development` | 运行环境 |
-| `AI_REQUEST_TIMEOUT_MS` | `90000` | AI 请求超时 |
+| `AI_REQUEST_TIMEOUT_MS` | `45000` | AI 请求总超时预算 |
 | `ALLOW_PRIVATE_AI_HOSTS` | `0` | 是否允许本地/内网 AI 地址 |
 | `ALLOWED_AI_HOSTS` | 示例见 `.env.example` | AI Base URL 白名单 |
 | `AI_PROVIDER_PRIMARY_DAILY_QUOTA` | `2000` | 前端传入主 provider 的日限额 |

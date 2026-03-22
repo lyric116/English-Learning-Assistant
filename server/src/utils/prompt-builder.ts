@@ -1,6 +1,185 @@
 // Prompt templates — preserved from original ai-service.js
 
+type UnknownRecord = Record<string, unknown>;
+
+function normalizePromptSourceText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function asRecord(value: unknown): UnknownRecord | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as UnknownRecord;
+}
+
+function asRecordArray(value: unknown): UnknownRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is UnknownRecord => !!item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function readNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  return null;
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
+function topEntries(counter: Record<string, number>, limit: number): string[] {
+  return Object.entries(counter)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+function isSummarizedLearningData(value: unknown): value is Record<string, unknown> {
+  const root = asRecord(value);
+  if (!root) return false;
+
+  const flashcards = asRecord(root.flashcards);
+  const reading = asRecord(root.reading);
+  const tests = asRecord(root.tests);
+  return !!flashcards && !!reading && !!tests
+    && typeof flashcards.total === 'number'
+    && typeof reading.total === 'number'
+    && typeof tests.total === 'number';
+}
+
+export function summarizeLearningDataForReport(learningData: unknown): Record<string, unknown> {
+  const root = asRecord(learningData) || {};
+  const flashcards = asRecordArray(root.flashcards).slice(-600);
+  const readingHistory = asRecordArray(root.readingHistory).slice(-120);
+  const testHistory = asRecordArray(root.testHistory).slice(-200);
+  const flashcardSessionSummary = asRecord(root.flashcardSessionSummary);
+  const now = Date.now();
+
+  const flashcardStatusCounts = { new: 0, reviewing: 0, mastered: 0 };
+  const flashcardAccuracies: number[] = [];
+  const flashcardReviewCounts: number[] = [];
+  let dueCount = 0;
+
+  const weakestWords = flashcards
+    .map(item => {
+      const word = readString(item.word);
+      const learningStatus = readString(item.learningStatus) || 'new';
+      const accuracy = readNumber(item.accuracy) ?? 0;
+      const reviewCount = readNumber(item.reviewCount) ?? 0;
+      const nextReviewAt = readNumber(item.nextReviewAt);
+      if (learningStatus === 'new') flashcardStatusCounts.new += 1;
+      if (learningStatus === 'reviewing') flashcardStatusCounts.reviewing += 1;
+      if (learningStatus === 'mastered') flashcardStatusCounts.mastered += 1;
+      if (typeof nextReviewAt === 'number' && nextReviewAt <= now && learningStatus !== 'mastered') {
+        dueCount += 1;
+      }
+      flashcardAccuracies.push(accuracy);
+      flashcardReviewCounts.push(reviewCount);
+      return { word, learningStatus, accuracy, reviewCount };
+    })
+    .filter(item => item.word)
+    .sort((a, b) => a.accuracy - b.accuracy || b.reviewCount - a.reviewCount)
+    .slice(0, 8);
+
+  const readingTopicCounter: Record<string, number> = {};
+  const readingDifficultyCounter: Record<string, number> = {};
+  const readingLengths: number[] = [];
+  const readingVocabularyCounts: number[] = [];
+  const recentReadingTitles = readingHistory
+    .slice(-5)
+    .reverse()
+    .map(item => {
+      const title = readString(item.title);
+      if (title) return title;
+      return readString(item.english).slice(0, 60);
+    })
+    .filter(Boolean);
+
+  readingHistory.forEach(item => {
+    const generationConfig = asRecord(item.generationConfig);
+    const topic = readString(generationConfig?.topic);
+    const difficulty = readString(generationConfig?.difficulty);
+    const english = readString(item.english);
+    const vocabulary = Array.isArray(item.vocabulary) ? item.vocabulary : [];
+
+    if (topic) readingTopicCounter[topic] = (readingTopicCounter[topic] || 0) + 1;
+    if (difficulty) readingDifficultyCounter[difficulty] = (readingDifficultyCounter[difficulty] || 0) + 1;
+    if (english) readingLengths.push(english.length);
+    readingVocabularyCounts.push(vocabulary.length);
+  });
+
+  const testScores: number[] = [];
+  const testByType: Record<string, number> = { reading: 0, vocabulary: 0 };
+  const recentScores: Array<{ type: string; score: number; date: string }> = [];
+  testHistory.forEach(item => {
+    const score = readNumber(item.score);
+    const type = readString(item.type) || 'unknown';
+    const date = readString(item.date);
+    if (score !== null) {
+      testScores.push(score);
+      recentScores.push({ type, score, date });
+    }
+    testByType[type] = (testByType[type] || 0) + 1;
+  });
+
+  return {
+    dataFootprint: {
+      flashcards: flashcards.length,
+      readingHistory: readingHistory.length,
+      testHistory: testHistory.length,
+    },
+    flashcards: {
+      total: flashcards.length,
+      statuses: flashcardStatusCounts,
+      dueCount,
+      averageAccuracy: average(flashcardAccuracies),
+      averageReviewCount: average(flashcardReviewCounts),
+      sampleWords: flashcards
+        .slice(0, 12)
+        .map(item => readString(item.word))
+        .filter(Boolean),
+      weakestWords,
+    },
+    flashcardSessionSummary: flashcardSessionSummary
+      ? {
+          extractedCount: readNumber(flashcardSessionSummary.extractedCount) ?? 0,
+          studiedCount: readNumber(flashcardSessionSummary.studiedCount) ?? 0,
+          correctCount: readNumber(flashcardSessionSummary.correctCount) ?? 0,
+          incorrectCount: readNumber(flashcardSessionSummary.incorrectCount) ?? 0,
+          accuracy: readNumber(flashcardSessionSummary.accuracy) ?? 0,
+          dueCount: readNumber(flashcardSessionSummary.dueCount) ?? 0,
+          updatedAt: readString(flashcardSessionSummary.updatedAt),
+        }
+      : null,
+    reading: {
+      total: readingHistory.length,
+      topTopics: topEntries(readingTopicCounter, 5),
+      difficultyDistribution: readingDifficultyCounter,
+      averageEnglishLength: average(readingLengths),
+      averageVocabularyCount: average(readingVocabularyCounts),
+      recentTitles: recentReadingTitles,
+    },
+    tests: {
+      total: testHistory.length,
+      byType: testByType,
+      averageScore: average(testScores),
+      bestScore: testScores.length > 0 ? Math.max(...testScores) : 0,
+      lowestScore: testScores.length > 0 ? Math.min(...testScores) : 0,
+      recentScores: recentScores.slice(-8),
+    },
+  };
+}
+
 export function buildExtractWordsPrompt(text: string, maxWords: number, level: string): string {
+  const normalizedText = normalizePromptSourceText(text);
   let levelPrompt = '';
   switch (level) {
     case 'cet4':
@@ -24,6 +203,14 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
 5. 英语例句
 6. 例句中文翻译
 
+输出约束：
+- definition 控制在 12 个中文字符以内
+- etymology 控制在 30 个中文字符以内，只保留最核心来源信息
+- example 控制在 16 个英文单词以内
+- exampleTranslation 控制在 20 个中文字符以内
+- 每个字段只输出内容本身，不要额外解释
+- 总项目数不要超过 ${maxWords}
+
 请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 [
   {
@@ -36,10 +223,11 @@ export function buildExtractWordsPrompt(text: string, maxWords: number, level: s
   }
 ]
 
-文本：${text}`;
+文本：${normalizedText}`;
 }
 
 export function buildAnalyzeSentencePrompt(sentence: string): string {
+  const normalizedSentence = normalizePromptSourceText(sentence);
   return `请你作为一位专业的英语语法分析专家，对下面这个英文句子进行全面细致的语法分析。请按照以下七个部分逐一分析，并用中文准确无误的输出结果：
 1. 句子结构（简单句、复合句、复杂句等）
 2. 从句分析（如果有）
@@ -48,6 +236,16 @@ export function buildAnalyzeSentencePrompt(sentence: string): string {
 5. 词级信息（词形还原、词性、核心语义、句中作用）
 6. 重要短语解析
 7. 语法要点解释（请附上标签）
+
+输出约束：
+- structure.explanation 控制在 40 个中文字符以内
+- clauses 最多 3 项；如果没有从句，返回 []
+- tense 最多 2 项
+- components 最多 6 项，每项 explanation 控制在 20 个中文字符以内
+- words 只保留最关键的 8 个词
+- phrases 最多 4 项
+- grammarPoints 最多 4 项，每项 explanation 控制在 24 个中文字符以内
+- 所有字段只输出必要信息，不要写额外说明文字
 
 请严格按照以下JSON格式返回，且包含以下字段，注意：输出格式为纯文本且无任何其他标识和符号：
 {
@@ -101,7 +299,7 @@ export function buildAnalyzeSentencePrompt(sentence: string): string {
   ]
 }
 
-句子：${sentence}`;
+句子：${normalizedSentence}`;
 }
 
 interface ReadingPromptOptions {
@@ -112,6 +310,7 @@ interface ReadingPromptOptions {
 }
 
 export function buildReadingContentPrompt(text: string, options: ReadingPromptOptions): string {
+  const normalizedText = normalizePromptSourceText(text);
   const topicPromptMap: Record<ReadingPromptOptions['topic'], string> = {
     general: '综合日常学习',
     work: '职场沟通与商务场景',
@@ -138,7 +337,7 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
   if (options.language === 'en') {
     return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，将以下英文文本翻译成中文，并提取重要词汇：
 
-英文原文：${text}
+英文原文：${normalizedText}
 
 生成要求：
 - 主题导向：${topicPrompt}
@@ -169,7 +368,7 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
 
   return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，请将以下中文文本翻译成英文，并提取重要词汇：
 
-中文原文：${text}
+中文原文：${normalizedText}
 
 生成要求：
 - 主题导向：${topicPrompt}
@@ -212,6 +411,7 @@ const QUIZ_DIFFICULTY_PROMPT_MAP: Record<QuizPromptOptions['difficulty'], string
 };
 
 export function buildReadingQuestionsPrompt(reading: string, options: QuizPromptOptions): string {
+  const normalizedReading = normalizePromptSourceText(reading);
   const difficultyPrompt = QUIZ_DIFFICULTY_PROMPT_MAP[options.difficulty];
   const timingPrompt = options.timedMode
     ? `本次测试为限时模式，总时长约 ${options.timeLimitMinutes} 分钟，请控制单题阅读负担。`
@@ -219,7 +419,7 @@ export function buildReadingQuestionsPrompt(reading: string, options: QuizPrompt
 
   return `请根据以下英语内容，生成${options.questionCount}道多选题测试阅读理解：
 
-内容：${reading}
+内容：${normalizedReading}
 
 出题要求：
 - 难度：${difficultyPrompt}
@@ -298,10 +498,13 @@ export function buildLearningReportPrompt(reportType: string, learningData: unkn
   };
   const template = reportTemplateMap[reportType] || reportTemplateMap.weekly;
   const reportTypeName = template.name;
+  const summarizedLearningData = isSummarizedLearningData(learningData)
+    ? learningData
+    : summarizeLearningDataForReport(learningData);
 
   return `请根据以下学习数据，生成一份${reportTypeName}：
 
-学习数据：${JSON.stringify(learningData)}
+学习数据摘要（已由系统预聚合，不是原始明细）：${JSON.stringify(summarizedLearningData)}
 
 模板重点：${template.focus}
 建议风格：${template.suggestionStyle}

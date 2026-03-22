@@ -14,6 +14,12 @@ export const AI_PROVIDERS: AIProviderPreset[] = [
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   },
   {
+    id: 'zhipu',
+    name: '智谱AI',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    models: ['glm-4.7-flash', 'glm-5'],
+  },
+  {
     id: 'groq',
     name: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',

@@ -34,6 +34,10 @@ const reportTypes: Array<{ value: ReportTemplateType; label: string; description
 ];
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const REPORT_FLASHCARD_LIMIT = 300;
+const REPORT_READING_LIMIT = 80;
+const REPORT_TEST_LIMIT = 120;
+const REPORT_VOCAB_PER_READING_LIMIT = 20;
 
 type TrendMetricKey = 'frequency' | 'accuracy' | 'wrongQuestions';
 type TrendDirection = 'up' | 'down' | 'stable';
@@ -324,6 +328,58 @@ function buildStructuredShareContent(args: {
   ].join('\n');
 }
 
+function compactLearningDataForReport(args: {
+  flashcards: Word[];
+  flashcardSessionSummary: FlashcardSessionSummary | null;
+  readingHistory: ReadingContent[];
+  testHistory: TestResult[];
+}): Record<string, unknown> {
+  const flashcards = args.flashcards
+    .slice(-REPORT_FLASHCARD_LIMIT)
+    .map(item => ({
+      word: item.word,
+      learningStatus: item.learningStatus,
+      nextReviewAt: item.nextReviewAt,
+      accuracy: item.accuracy,
+      reviewCount: item.reviewCount,
+    }));
+
+  const readingHistory = args.readingHistory
+    .slice(-REPORT_READING_LIMIT)
+    .map(item => ({
+      title: item.title,
+      english: item.english,
+      chinese: item.chinese,
+      timestamp: item.timestamp,
+      generationConfig: item.generationConfig,
+      vocabulary: (item.vocabulary || []).slice(0, REPORT_VOCAB_PER_READING_LIMIT).map(v => ({
+        word: v.word,
+        meaning: v.meaning,
+      })),
+    }));
+
+  const testHistory = args.testHistory
+    .slice(-REPORT_TEST_LIMIT)
+    .map(item => ({
+      type: item.type,
+      score: item.score,
+      date: item.date,
+      readingTitle: item.readingTitle,
+      questionCount: item.questionCount,
+      difficulty: item.difficulty,
+      timedMode: item.timedMode,
+      timeLimitMinutes: item.timeLimitMinutes,
+      timeSpentSeconds: item.timeSpentSeconds,
+    }));
+
+  return {
+    flashcards,
+    flashcardSessionSummary: args.flashcardSessionSummary,
+    readingHistory,
+    testHistory,
+  };
+}
+
 export function AchievementsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -383,7 +439,12 @@ export function AchievementsPage() {
     setErrorMessage('');
     setLoading(true);
     try {
-      const learningData = { flashcards, flashcardSessionSummary, readingHistory, testHistory };
+      const learningData = compactLearningDataForReport({
+        flashcards,
+        flashcardSessionSummary,
+        readingHistory,
+        testHistory,
+      });
       const result = await api.report.generate(selectedType, learningData) as LearningReport;
       const normalized: LearningReport = {
         ...result,

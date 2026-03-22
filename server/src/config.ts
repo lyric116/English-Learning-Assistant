@@ -50,7 +50,7 @@ export const config = {
     max: 20,
   },
   ai: {
-    requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS || '90000', 10),
+    requestTimeoutMs: parsePositiveInt(process.env.AI_REQUEST_TIMEOUT_MS, 45000),
     allowPrivateHosts: process.env.ALLOW_PRIVATE_AI_HOSTS === '1',
     primaryDailyQuota: parsePositiveInt(process.env.AI_PROVIDER_PRIMARY_DAILY_QUOTA, 2000),
     fallbackProviders: parseFallbackProviders(process.env.AI_FALLBACK_PROVIDERS),

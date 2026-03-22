@@ -76,8 +76,27 @@ app.use('/api/v1', (_req, res) => {
 app.use(errorHandler);
 
 if (process.env.VERCEL !== '1') {
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     logger.info('server.started', { port: config.port, env: config.nodeEnv });
+  });
+
+  server.on('error', error => {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === 'EADDRINUSE') {
+      logger.error('server.listen.failed', {
+        port: config.port,
+        code: err.code,
+        message: `端口 ${config.port} 已被占用。请停止旧进程，或使用 PORT=<新端口> npm run dev 启动。`,
+      });
+      process.exit(1);
+    }
+
+    logger.error('server.listen.failed', {
+      port: config.port,
+      code: err.code || 'UNKNOWN',
+      message: err.message || '监听端口失败',
+    });
+    process.exit(1);
   });
 }
 

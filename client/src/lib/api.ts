@@ -7,11 +7,13 @@ const API_BASE = '/api/v1';
 const REQUEST_TIMEOUT_MS = 55_000;
 type FlashcardLevel = 'all' | 'cet4' | 'cet6' | 'advanced';
 type ReadingLanguage = 'en' | 'zh';
+type ReadingGenerationMode = 'fromText' | 'auto';
 type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
 type ReadingDifficulty = 'easy' | 'medium' | 'hard';
 type ReadingLength = 'short' | 'medium' | 'long';
 type QuizDifficulty = 'easy' | 'medium' | 'hard';
 type ReadingGenerateOptions = {
+  generationMode?: ReadingGenerationMode;
   language?: ReadingLanguage;
   topic?: ReadingTopic;
   difficulty?: ReadingDifficulty;
@@ -144,7 +146,7 @@ export const api = {
         : (languageOrOptions ?? {});
       return request('/reading/generate', {
         method: 'POST',
-        body: JSON.stringify({ text, ...options }),
+        body: JSON.stringify({ text, generationMode: 'fromText', ...options }),
       });
     },
     history: (limit = 20) =>

@@ -75,8 +75,10 @@ export type ReadingLanguage = 'en' | 'zh';
 export type ReadingTopic = 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
 export type ReadingDifficulty = 'easy' | 'medium' | 'hard';
 export type ReadingLength = 'short' | 'medium' | 'long';
+export type ReadingGenerationMode = 'fromText' | 'auto';
 
 export interface ReadingGenerationConfig {
+  generationMode?: ReadingGenerationMode;
   language: ReadingLanguage;
   topic: ReadingTopic;
   difficulty: ReadingDifficulty;

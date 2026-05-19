@@ -24,6 +24,7 @@ import type {
   ReadingDifficulty,
   ReadingFavorite,
   ReadingGenerationConfig,
+  ReadingGenerationMode,
   ReadingLanguage,
   ReadingLength,
   ReadingTopic,
@@ -54,6 +55,11 @@ const LENGTH_LABELS: Record<ReadingLength, string> = {
 const LANGUAGE_LABELS: Record<ReadingLanguage, string> = {
   en: '英文 → 中文',
   zh: '中文 → 英文',
+};
+
+const GENERATION_MODE_LABELS: Record<ReadingGenerationMode, string> = {
+  fromText: '素材生成',
+  auto: 'AI 自动生成',
 };
 
 const TOPIC_OPTIONS: ReadingTopic[] = ['general', 'work', 'travel', 'technology', 'culture', 'education'];
@@ -120,6 +126,7 @@ export function ReadingPage() {
   const [difficulty, setDifficulty] = useState<ReadingDifficulty>('medium');
   const [length, setLength] = useState<ReadingLength>('medium');
   const [loading, setLoading] = useState(false);
+  const [loadingMode, setLoadingMode] = useState<ReadingGenerationMode | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [historyHydrated, setHistoryHydrated] = useState(false);
   const [reading, setReading] = useState<ReadingContent | null>(null);
@@ -196,8 +203,8 @@ export function ReadingPage() {
     });
   }, [favoriteQuery, favoriteSort, favorites]);
 
-  const generate = async () => {
-    if (!inputText.trim()) return;
+  const generateReading = async (generationMode: ReadingGenerationMode) => {
+    if (generationMode === 'fromText' && !inputText.trim()) return;
     if (!LANGUAGE_OPTIONS.includes(language)
       || !TOPIC_OPTIONS.includes(topic)
       || !DIFFICULTY_OPTIONS.includes(difficulty)
@@ -207,22 +214,39 @@ export function ReadingPage() {
     }
     setErrorMessage('');
     setLoading(true);
+    setLoadingMode(generationMode);
     try {
-      const config: ReadingGenerationConfig = { language, topic, difficulty, length };
-      const result = await api.reading.generate(inputText, config) as ReadingContent;
+      const config: ReadingGenerationConfig = {
+        generationMode,
+        language: generationMode === 'auto' ? 'en' : language,
+        topic,
+        difficulty,
+        length,
+      };
+      const sourceText = generationMode === 'auto' ? '' : inputText;
+      const result = await api.reading.generate(sourceText, config) as ReadingContent;
       const withTimestamp = { ...result, timestamp: Date.now(), generationConfig: config };
       setReading(withTimestamp);
       setErrorMessage('');
       setQuizReadingContext(withTimestamp);
       setHistory(prev => [withTimestamp, ...prev].slice(0, 10));
-      toast('双语内容生成成功', 'success');
+      toast(generationMode === 'auto' ? 'AI 已自动生成阅读材料' : '双语内容生成成功', 'success');
     } catch (err) {
       const message = (err as Error).message;
       setErrorMessage(message);
       toast(`生成失败: ${message}`, 'error');
     } finally {
       setLoading(false);
+      setLoadingMode(null);
     }
+  };
+
+  const generate = () => {
+    void generateReading('fromText');
+  };
+
+  const generateAutoReading = () => {
+    void generateReading('auto');
   };
 
   const toggleFavorite = () => {
@@ -233,6 +257,7 @@ export function ReadingPage() {
     } else {
       const generatedTags = reading.generationConfig
         ? [
+            GENERATION_MODE_LABELS[reading.generationConfig.generationMode ?? 'fromText'],
             TOPIC_LABELS[reading.generationConfig.topic],
             DIFFICULTY_LABELS[reading.generationConfig.difficulty],
             LENGTH_LABELS[reading.generationConfig.length],
@@ -308,8 +333,8 @@ export function ReadingPage() {
       <ModuleSection
         index={0}
         type="input"
-        title="输入阅读素材"
-        description="输入素材并设置主题、难度、篇幅与语言方向。"
+        title="准备阅读素材"
+        description="输入素材或按当前主题、难度、篇幅自动生成阅读材料。"
       >
         <Card>
           <div className="relative">
@@ -348,9 +373,22 @@ export function ReadingPage() {
                 <option key={option} value={option}>{LENGTH_LABELS[option]}</option>
               ))}
             </Select>
-            <Button onClick={generate} loading={loading} disabled={loading || !inputText.trim()}>
+            <Button
+              onClick={generate}
+              loading={loading && loadingMode === 'fromText'}
+              disabled={loading || !inputText.trim()}
+            >
               <Sparkles className="h-4 w-4 mr-1.5" />
               生成双语内容
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={generateAutoReading}
+              loading={loading && loadingMode === 'auto'}
+              disabled={loading}
+            >
+              <BookOpen className="h-4 w-4 mr-1.5" />
+              没有素材？AI 自动生成一篇
             </Button>
             <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">支持任意长度文本</span>
           </div>
@@ -391,13 +429,17 @@ export function ReadingPage() {
         title="阅读结果"
         description="查看双语内容与重点词汇。"
       >
-        {loading && <LoadingSpinner text="AI 正在翻译并提取词汇..." />}
+        {loading && (
+          <LoadingSpinner
+            text={loadingMode === 'auto' ? 'AI 正在创作阅读材料...' : 'AI 正在翻译并提取词汇...'}
+          />
+        )}
 
         {!reading && !loading && (
           <EmptyState
             icon={<BookOpen className="h-16 w-16" />}
             title="开始双语阅读"
-            description="输入英文或中文文本，AI 将生成中英双语对照内容，并提取重点词汇。"
+            description="输入英文或中文文本，或按当前阅读参数自动生成一篇学习材料。"
           />
         )}
 
@@ -412,11 +454,14 @@ export function ReadingPage() {
               {reading.generationConfig && (
                 <div className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full bg-muted px-2.5 py-1">
-                    {LANGUAGE_LABELS[reading.generationConfig.language]}
+                    {GENERATION_MODE_LABELS[reading.generationConfig.generationMode ?? 'fromText']}
                   </span>
-                  <span className="rounded-full bg-muted px-2.5 py-1">
-                    主题: {TOPIC_LABELS[reading.generationConfig.topic]}
-                  </span>
+                  {(reading.generationConfig.generationMode ?? 'fromText') === 'fromText' && (
+                    <span className="rounded-full bg-muted px-2.5 py-1">
+                      {LANGUAGE_LABELS[reading.generationConfig.language]}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-muted px-2.5 py-1">主题: {TOPIC_LABELS[reading.generationConfig.topic]}</span>
                   <span className="rounded-full bg-muted px-2.5 py-1">
                     难度: {DIFFICULTY_LABELS[reading.generationConfig.difficulty]}
                   </span>

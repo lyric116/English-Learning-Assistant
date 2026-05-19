@@ -59,3 +59,42 @@ test('api request throws code-aware error message on non-2xx', async () => {
     },
   );
 });
+
+test('api.reading.generate sends auto generation mode payload', async () => {
+  const localStorage = createStorage();
+  const sessionStorage = createStorage();
+  globalThis.localStorage = localStorage as Storage;
+  globalThis.sessionStorage = sessionStorage as Storage;
+
+  let requestBody: Record<string, unknown> | null = null;
+  globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    requestBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    return {
+      ok: true,
+      json: async () => ({
+        success: true,
+        code: 'OK',
+        message: 'ok',
+        data: {
+          title: 'A Smarter City',
+          english: 'A city uses sensors to save energy.',
+          chinese: '一座城市使用传感器节省能源。',
+          vocabulary: [],
+        },
+      }),
+    };
+  }) as typeof fetch;
+
+  await api.reading.generate('', {
+    generationMode: 'auto',
+    topic: 'technology',
+    difficulty: 'medium',
+    length: 'short',
+  });
+
+  assert.equal(requestBody?.text, '');
+  assert.equal(requestBody?.generationMode, 'auto');
+  assert.equal(requestBody?.topic, 'technology');
+  assert.equal(requestBody?.difficulty, 'medium');
+  assert.equal(requestBody?.length, 'short');
+});

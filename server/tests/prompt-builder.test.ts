@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { summarizeLearningDataForReport } from '../src/utils/prompt-builder.ts';
+import { buildReadingContentPrompt, summarizeLearningDataForReport } from '../src/utils/prompt-builder.ts';
 
 test('summarizeLearningDataForReport compacts learning history into aggregate metrics', () => {
   const now = Date.now();
@@ -69,4 +69,21 @@ test('summarizeLearningDataForReport compacts learning history into aggregate me
   assert.equal(summary.tests.averageScore, 82);
   assert.equal(summary.tests.byType.reading, 1);
   assert.equal(summary.tests.byType.vocabulary, 1);
+});
+
+test('buildReadingContentPrompt supports auto-generated reading materials', () => {
+  const prompt = buildReadingContentPrompt('', {
+    generationMode: 'auto',
+    language: 'en',
+    topic: 'technology',
+    difficulty: 'medium',
+    length: 'medium',
+  });
+
+  assert.match(prompt, /原创一篇英文短文/);
+  assert.match(prompt, /科技与互联网/);
+  assert.match(prompt, /220-320 词/);
+  assert.match(prompt, /"title": "文章标题"/);
+  assert.doesNotMatch(prompt, /英文原文：/);
+  assert.doesNotMatch(prompt, /中文原文：/);
 });

@@ -25,6 +25,7 @@ interface SentenceAnalyzePayload {
 
 interface ReadingGeneratePayload {
   text: string;
+  generationMode: 'fromText' | 'auto';
   language: 'en' | 'zh';
   topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
   difficulty: 'easy' | 'medium' | 'hard';
@@ -105,6 +106,27 @@ function readRequiredString(
     throw new ValidationError(`${label}不能为空`);
   }
 
+  if (trimmed.length > maxLength) {
+    throw new ValidationError(`${label}长度不能超过 ${maxLength} 个字符`);
+  }
+
+  return trimmed;
+}
+
+function readOptionalString(
+  obj: ObjectRecord,
+  key: string,
+  label: string,
+  maxLength: number,
+): string {
+  const value = obj[key];
+  if (value === undefined) return '';
+
+  if (typeof value !== 'string') {
+    throw new ValidationError(`${label}必须是字符串`);
+  }
+
+  const trimmed = value.trim();
   if (trimmed.length > maxLength) {
     throw new ValidationError(`${label}长度不能超过 ${maxLength} 个字符`);
   }
@@ -241,7 +263,16 @@ export function validateSentenceAnalyzePayload(body: unknown): SentenceAnalyzePa
 export function validateReadingGeneratePayload(body: unknown): ReadingGeneratePayload {
   const obj = ensureObject(body);
 
-  const text = readRequiredString(obj, 'text', '文本内容', MAX_READING_SOURCE_LENGTH);
+  const generationMode = readOptionalEnum(
+    obj,
+    'generationMode',
+    'fromText',
+    '生成模式',
+    ['fromText', 'auto'] as const,
+  );
+  const text = generationMode === 'auto'
+    ? readOptionalString(obj, 'text', '文本内容', MAX_READING_SOURCE_LENGTH)
+    : readRequiredString(obj, 'text', '文本内容', MAX_READING_SOURCE_LENGTH);
   const language = readOptionalEnum(obj, 'language', 'en', '语言方向', ['en', 'zh'] as const);
   const topic = readOptionalEnum(
     obj,
@@ -266,7 +297,7 @@ export function validateReadingGeneratePayload(body: unknown): ReadingGeneratePa
   );
   const aiConfig = readOptionalAiConfig(obj);
 
-  return { text, language, topic, difficulty, length, aiConfig };
+  return { text, generationMode, language, topic, difficulty, length, aiConfig };
 }
 
 export function validateReadingQuestionsPayload(body: unknown): ReadingQuestionsPayload {

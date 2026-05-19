@@ -16,6 +16,7 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
   try {
     const {
       text,
+      generationMode,
       language,
       topic,
       difficulty,
@@ -24,7 +25,7 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
     } = validateReadingGeneratePayload(req.body);
     const result = await generateReadingContent(
       text,
-      { language, topic, difficulty, length },
+      { generationMode, language, topic, difficulty, length },
       aiConfig,
     );
     learningDataRepository.persistReadingContent(req.header('x-anonymous-session-id') || undefined, {

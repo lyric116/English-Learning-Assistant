@@ -14,9 +14,25 @@ test('validateReadingGeneratePayload accepts valid input with defaults', () => {
   });
 
   assert.equal(payload.language, 'en');
+  assert.equal(payload.generationMode, 'fromText');
   assert.equal(payload.topic, 'general');
   assert.equal(payload.difficulty, 'medium');
   assert.equal(payload.length, 'medium');
+});
+
+test('validateReadingGeneratePayload accepts auto mode without source text', () => {
+  const payload = validateReadingGeneratePayload({
+    generationMode: 'auto',
+    topic: 'technology',
+    difficulty: 'medium',
+    length: 'short',
+  });
+
+  assert.equal(payload.text, '');
+  assert.equal(payload.generationMode, 'auto');
+  assert.equal(payload.topic, 'technology');
+  assert.equal(payload.difficulty, 'medium');
+  assert.equal(payload.length, 'short');
 });
 
 test('validateReadingGeneratePayload rejects non-string text', () => {

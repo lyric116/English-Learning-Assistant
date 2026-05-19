@@ -22,6 +22,7 @@ interface AIConfig {
 }
 
 interface ReadingGenerateOptions {
+  generationMode: 'fromText' | 'auto';
   language: 'en' | 'zh';
   topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
   difficulty: 'easy' | 'medium' | 'hard';
@@ -439,6 +440,7 @@ function validateAIConfig(aiConfig?: AIConfig): asserts aiConfig is AIConfig {
 
 function normalizeReadingOptions(options?: Partial<ReadingGenerateOptions>): ReadingGenerateOptions {
   return {
+    generationMode: options?.generationMode ?? 'fromText',
     language: options?.language ?? 'en',
     topic: options?.topic ?? 'general',
     difficulty: options?.difficulty ?? 'medium',
@@ -485,6 +487,18 @@ function normalizeReadingResponse(payload: unknown) {
     vocabulary: normalizedVocabulary,
     title: typeof raw.title === 'string' ? raw.title.trim() : undefined,
   };
+}
+
+function resolveReadingMaxTokens(options: ReadingGenerateOptions): number {
+  const byLength: Record<ReadingGenerateOptions['length'], number> = {
+    short: 1_200,
+    medium: 1_800,
+    long: 2_600,
+  };
+
+  return options.generationMode === 'auto'
+    ? byLength[options.length]
+    : Math.max(1_200, byLength[options.length]);
 }
 
 async function postChatCompletions(
@@ -673,7 +687,12 @@ export async function analyzeSentence(sentence: string, aiConfig?: AIConfig) {
 export async function generateReadingContent(text: string, options?: Partial<ReadingGenerateOptions>, aiConfig?: AIConfig) {
   const normalizedOptions = normalizeReadingOptions(options);
   const prompt = buildReadingContentPrompt(normalizePromptText(text), normalizedOptions);
-  const content = await sendRequest('reading_generate', prompt, { temperature: 0.7, maxTokens: 1_200 }, aiConfig);
+  const content = await sendRequest(
+    'reading_generate',
+    prompt,
+    { temperature: 0.7, maxTokens: resolveReadingMaxTokens(normalizedOptions) },
+    aiConfig,
+  );
   const result = parseStructuredContent('reading_generate', content);
   return normalizeReadingResponse(result);
 }

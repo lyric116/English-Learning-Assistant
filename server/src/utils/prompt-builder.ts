@@ -303,6 +303,7 @@ export function buildAnalyzeSentencePrompt(sentence: string): string {
 }
 
 interface ReadingPromptOptions {
+  generationMode: 'fromText' | 'auto';
   language: 'en' | 'zh';
   topic: 'general' | 'work' | 'travel' | 'technology' | 'culture' | 'education';
   difficulty: 'easy' | 'medium' | 'hard';
@@ -333,6 +334,35 @@ export function buildReadingContentPrompt(text: string, options: ReadingPromptOp
   const topicPrompt = topicPromptMap[options.topic];
   const difficultyPrompt = difficultyPromptMap[options.difficulty];
   const lengthPrompt = lengthPromptMap[options.length];
+
+  if (options.generationMode === 'auto') {
+    return `请作为英语学习材料编写专家，根据以下要求生成一篇适合英语学习者的英文阅读材料：
+
+主题：${topicPrompt}
+难度：${difficultyPrompt}
+篇幅：${lengthPrompt}
+
+要求：
+1. 原创一篇英文短文，不要要求用户提供原文
+2. 内容符合主题，适合英语学习
+3. 同时给出自然流畅的中文翻译
+4. 提取 10 个以内重点词汇，包含 word、phonetic、meaning、example
+5. 返回严格 JSON 格式，输出必须是纯 JSON 文本，不要包含 Markdown、HTML 或任何额外说明
+
+{
+  "title": "文章标题",
+  "english": "英文阅读材料",
+  "chinese": "中文翻译",
+  "vocabulary": [
+    {
+      "word": "单词",
+      "phonetic": "音标",
+      "meaning": "中文释义",
+      "example": "英文例句"
+    }
+  ]
+}`;
+  }
 
   if (options.language === 'en') {
     return `请作为一位专业的中英文翻译专家，在准确传达原文意思，语言自然流畅，符合目标语言文化习惯的要求下，将以下英文文本翻译成中文，并提取重要词汇：

@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getAnonymousSessionId } from '../src/lib/session.ts';
+import {
+  AUTH_SESSION_KEY,
+  clearAuthSession,
+  clearLocalLearningCache,
+  getAuthSession,
+  getAuthToken,
+  saveAuthSession,
+} from '../src/lib/auth-session.ts';
 
 function createStorage() {
   const store = new Map<string, string>();
@@ -41,3 +49,33 @@ test('getAnonymousSessionId reuses existing anonymous session id', () => {
   assert.equal(getAnonymousSessionId(), 'existing-session');
 });
 
+test('auth session helpers save, read, and clear login state', () => {
+  const storage = createStorage();
+  saveAuthSession({
+    token: 'token-1',
+    expiresAt: '2026-06-01T00:00:00.000Z',
+    user: { id: 'user-1', email: 'learner@example.com', status: 'active' },
+  }, storage as Storage);
+
+  assert.equal(getAuthToken(storage as Storage), 'token-1');
+  assert.equal(getAuthSession(storage as Storage)?.user.email, 'learner@example.com');
+
+  clearAuthSession(storage as Storage);
+  assert.equal(storage.getItem(AUTH_SESSION_KEY), null);
+  assert.equal(getAuthSession(storage as Storage), null);
+});
+
+test('clearLocalLearningCache removes learning data but keeps anonymous session', () => {
+  const storage = createStorage();
+  storage.setItem('anonymous-session-id', 'anon-1');
+  storage.setItem('flashcards', '[]');
+  storage.setItem('readingHistory', '[]');
+  storage.setItem(AUTH_SESSION_KEY, '{}');
+
+  clearLocalLearningCache(storage as Storage);
+
+  assert.equal(storage.getItem('anonymous-session-id'), 'anon-1');
+  assert.equal(storage.getItem('flashcards'), null);
+  assert.equal(storage.getItem('readingHistory'), null);
+  assert.equal(storage.getItem(AUTH_SESSION_KEY), '{}');
+});

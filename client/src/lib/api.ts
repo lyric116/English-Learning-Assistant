@@ -1,6 +1,8 @@
 import type { AIConfig } from '@/types';
 import { STORAGE_KEY } from './ai-providers.ts';
 import { recordAiCall, shouldAllowCallOverLimit } from './ai-usage.ts';
+import type { AuthSession } from './auth-session.ts';
+import { getAuthToken } from './auth-session.ts';
 import { getAnonymousSessionId } from './session.ts';
 
 const API_BASE = '/api/v1';
@@ -25,6 +27,13 @@ type QuizGenerateOptions = {
   timedMode?: boolean;
   timeLimitMinutes?: number;
 };
+type AuthPayload = {
+  email: string;
+  password: string;
+  displayName?: string;
+  anonymousSessionId?: string;
+  importAnonymousData?: boolean;
+};
 type ApiEnvelope = {
   success?: boolean;
   code?: string;
@@ -34,7 +43,16 @@ type ApiEnvelope = {
 };
 
 function isAiRequest(url: string, method: string): boolean {
-  return method === 'POST' && url !== '/health';
+  if (method !== 'POST') return false;
+  return [
+    '/ai/test',
+    '/flashcards/extract',
+    '/sentence/analyze',
+    '/reading/generate',
+    '/quiz/reading-questions',
+    '/quiz/vocabulary-questions',
+    '/report/generate',
+  ].includes(url);
 }
 
 function getAIConfig(): AIConfig | null {
@@ -89,6 +107,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
   headers.set('x-anonymous-session-id', getAnonymousSessionId());
+  const authToken = getAuthToken();
+  if (authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
 
   try {
     const res = await fetch(`${API_BASE}${url}`, {
@@ -121,6 +143,25 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  auth: {
+    register: (payload: AuthPayload) =>
+      request<AuthSession>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    login: (payload: AuthPayload) =>
+      request<AuthSession>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    me: () =>
+      request<Pick<AuthSession, 'user' | 'expiresAt'>>('/auth/me'),
+    logout: () =>
+      request<{ ok: boolean }>('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+  },
   flashcards: {
     extract: (text: string, maxWords?: number, level?: FlashcardLevel) =>
       request('/flashcards/extract', {

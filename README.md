@@ -145,6 +145,10 @@ npm run dev:client
 当前后端主要入口在 `/api/v1`：
 
 - `GET /api/v1/health`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `POST /api/v1/auth/logout`
 - `POST /api/v1/ai/test`
 - `POST /api/v1/flashcards/extract`
 - `GET /api/v1/flashcards/history`
@@ -209,7 +213,8 @@ CI 位于 `.github/workflows/ci.yml`，会执行：
 
 ## 数据与状态
 
-- 服务端通过 `x-anonymous-session-id` 维护匿名会话粒度的数据归属。
+- 服务端通过 `x-anonymous-session-id` 维护匿名会话粒度的数据归属；登录后通过 `Authorization: Bearer <token>` 切换为账号级数据归属。
+- 登录/注册是可选能力，匿名用户仍可继续使用；注册或登录时可导入当前匿名数据到账号。
 - SQLite 默认文件位于 `server/data/english-learning.db`。
 - 应用启动时会检查旧版 `localStorage` 数据，并在数据库为空时自动触发一次 backfill。
 - 分享报告页路由为 `/share/:shareId`，对应服务端分享与埋点接口。

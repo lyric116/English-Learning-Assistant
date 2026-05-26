@@ -3,8 +3,10 @@ import { extractWords } from '../services/ai-service';
 import { validateFlashcardsExtractPayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const flashcardsRouter = Router();
+flashcardsRouter.use(requestOwnerMiddleware);
 
 interface ExtractedWord {
   word: string;
@@ -50,7 +52,7 @@ flashcardsRouter.post('/extract', async (req: Request, res: Response, next: Next
     const { text, maxWords, level, aiConfig } = validateFlashcardsExtractPayload(req.body);
     const result = await extractWords(text, maxWords, level, aiConfig);
     const normalizedResult = normalizeExtractedWords(result, maxWords);
-    learningDataRepository.persistFlashcards(req.header('x-anonymous-session-id') || undefined, normalizedResult);
+    learningDataRepository.persistFlashcards(getRequestOwner(req), normalizedResult);
     sendSuccess(res, normalizedResult);
   } catch (err) {
     next(err);
@@ -60,7 +62,7 @@ flashcardsRouter.post('/extract', async (req: Request, res: Response, next: Next
 flashcardsRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseLimit(req.query.limit, 120);
-    const result = learningDataRepository.getFlashcards(req.header('x-anonymous-session-id') || undefined, limit);
+    const result = learningDataRepository.getFlashcards(getRequestOwner(req), limit);
     sendSuccess(res, result);
   } catch (err) {
     next(err);

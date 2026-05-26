@@ -3,6 +3,7 @@ import { generateLearningReport } from '../services/ai-service';
 import { validateReportGeneratePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendError, sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const reportRouter = Router();
 
@@ -17,12 +18,12 @@ function readParam(value: string | string[] | undefined): string {
   return (value || '').trim();
 }
 
-reportRouter.post('/generate', async (req: Request, res: Response, next: NextFunction) => {
+reportRouter.post('/generate', requestOwnerMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { reportType, learningData, aiConfig } = validateReportGeneratePayload(req.body);
     const result = await generateLearningReport(reportType, learningData, aiConfig);
     learningDataRepository.persistLearningReport(
-      req.header('x-anonymous-session-id') || undefined,
+      getRequestOwner(req),
       reportType,
       result as Record<string, unknown>,
     );
@@ -32,17 +33,17 @@ reportRouter.post('/generate', async (req: Request, res: Response, next: NextFun
   }
 });
 
-reportRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
+reportRouter.get('/history', requestOwnerMiddleware, (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseLimit(req.query.limit, 20);
-    const result = learningDataRepository.getReportHistory(req.header('x-anonymous-session-id') || undefined, limit);
+    const result = learningDataRepository.getReportHistory(getRequestOwner(req), limit);
     sendSuccess(res, result);
   } catch (err) {
     next(err);
   }
 });
 
-reportRouter.post('/share', (req: Request, res: Response, next: NextFunction) => {
+reportRouter.post('/share', requestOwnerMiddleware, (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -57,7 +58,7 @@ reportRouter.post('/share', (req: Request, res: Response, next: NextFunction) =>
     }
 
     const created = learningDataRepository.createSharedReport(
-      req.header('x-anonymous-session-id') || undefined,
+      getRequestOwner(req),
       report as Record<string, unknown>,
     );
 

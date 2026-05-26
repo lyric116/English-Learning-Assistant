@@ -3,8 +3,10 @@ import { generateReadingContent } from '../services/ai-service';
 import { validateReadingGeneratePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const readingRouter = Router();
+readingRouter.use(requestOwnerMiddleware);
 
 function parseLimit(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -28,7 +30,7 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
       { generationMode, language, topic, difficulty, length },
       aiConfig,
     );
-    learningDataRepository.persistReadingContent(req.header('x-anonymous-session-id') || undefined, {
+    learningDataRepository.persistReadingContent(getRequestOwner(req), {
       language,
       topic,
       difficulty,
@@ -47,7 +49,7 @@ readingRouter.post('/generate', async (req: Request, res: Response, next: NextFu
 readingRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseLimit(req.query.limit, 20);
-    const result = learningDataRepository.getReadingHistory(req.header('x-anonymous-session-id') || undefined, limit);
+    const result = learningDataRepository.getReadingHistory(getRequestOwner(req), limit);
     sendSuccess(res, result);
   } catch (err) {
     next(err);

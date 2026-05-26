@@ -1,12 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const migrationRouter = Router();
+migrationRouter.use(requestOwnerMiddleware);
 
 migrationRouter.get('/status', (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = learningDataRepository.getBackfillStatus(req.header('x-anonymous-session-id') || undefined);
+    const result = learningDataRepository.getBackfillStatus(getRequestOwner(req));
     sendSuccess(res, result);
   } catch (err) {
     next(err);
@@ -17,7 +19,7 @@ migrationRouter.post('/backfill', (req: Request, res: Response, next: NextFuncti
   try {
     const payload = (req.body && typeof req.body === 'object') ? req.body as Record<string, unknown> : {};
     const result = learningDataRepository.runBackfill(
-      req.header('x-anonymous-session-id') || undefined,
+      getRequestOwner(req),
       {
         flashcards: Array.isArray(payload.flashcards) ? payload.flashcards as never[] : [],
         sentenceHistory: Array.isArray(payload.sentenceHistory) ? payload.sentenceHistory as never[] : [],

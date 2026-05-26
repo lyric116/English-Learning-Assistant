@@ -3,8 +3,10 @@ import { generateReadingQuestions, generateVocabularyQuestions } from '../servic
 import { validateReadingQuestionsPayload, validateVocabularyQuestionsPayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const quizRouter = Router();
+quizRouter.use(requestOwnerMiddleware);
 
 function parseLimit(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -27,7 +29,7 @@ quizRouter.post('/reading-questions', async (req: Request, res: Response, next: 
       { questionCount, difficulty, timedMode, timeLimitMinutes },
       aiConfig,
     );
-    learningDataRepository.persistQuizGeneration(req.header('x-anonymous-session-id') || undefined, {
+    learningDataRepository.persistQuizGeneration(getRequestOwner(req), {
       quizType: 'reading',
       questionCount,
       difficulty,
@@ -57,7 +59,7 @@ quizRouter.post('/history/sync', (req: Request, res: Response, next: NextFunctio
       ? payload.readingTitle
       : '未知阅读';
 
-    learningDataRepository.persistQuizResult(req.header('x-anonymous-session-id') || undefined, {
+    learningDataRepository.persistQuizResult(getRequestOwner(req), {
       type,
       score,
       date,
@@ -77,7 +79,7 @@ quizRouter.post('/history/sync', (req: Request, res: Response, next: NextFunctio
 quizRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseLimit(req.query.limit, 20);
-    const result = learningDataRepository.getQuizHistory(req.header('x-anonymous-session-id') || undefined, limit);
+    const result = learningDataRepository.getQuizHistory(getRequestOwner(req), limit);
     sendSuccess(res, result);
   } catch (err) {
     next(err);
@@ -99,7 +101,7 @@ quizRouter.post('/vocabulary-questions', async (req: Request, res: Response, nex
       { questionCount, difficulty, timedMode, timeLimitMinutes },
       aiConfig,
     );
-    learningDataRepository.persistQuizGeneration(req.header('x-anonymous-session-id') || undefined, {
+    learningDataRepository.persistQuizGeneration(getRequestOwner(req), {
       quizType: 'vocabulary',
       questionCount,
       difficulty,

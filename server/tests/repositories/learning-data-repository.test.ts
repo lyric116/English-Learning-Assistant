@@ -91,3 +91,37 @@ test('repository isolates anonymous session owners', () => {
   assert.equal(learningDataRepository.getReadingHistory('session-a', 5).length, 1);
   assert.equal(learningDataRepository.getReadingHistory('session-b', 5).length, 0);
 });
+
+test('repository isolates authenticated users from same-id anonymous owners', () => {
+  const ownerId = 'shared-owner-id';
+
+  learningDataRepository.persistReadingContent(ownerId, {
+    language: 'en',
+    topic: 'general',
+    difficulty: 'medium',
+    length: 'short',
+    title: 'Anonymous Same Id',
+    english: 'Anonymous data with the same owner id.',
+    chinese: '同名匿名数据。',
+    vocabulary: [],
+  });
+
+  learningDataRepository.persistReadingContent({ ownerType: 'user', ownerId }, {
+    language: 'en',
+    topic: 'education',
+    difficulty: 'easy',
+    length: 'short',
+    title: 'User Same Id',
+    english: 'User data with the same owner id.',
+    chinese: '同名用户数据。',
+    vocabulary: [],
+  });
+
+  const anonymousHistory = learningDataRepository.getReadingHistory(ownerId, 5);
+  const userHistory = learningDataRepository.getReadingHistory({ ownerType: 'user', ownerId }, 5);
+
+  assert.equal(anonymousHistory.length, 1);
+  assert.equal(anonymousHistory[0]?.title, 'Anonymous Same Id');
+  assert.equal(userHistory.length, 1);
+  assert.equal(userHistory[0]?.title, 'User Same Id');
+});

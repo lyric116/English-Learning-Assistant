@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { logger } from '../utils/logger';
+import { normalizeDataOwner, type OwnerInput } from '../utils/owner';
 import { SqliteClient } from './sqlite-client';
 
 interface FlashcardRecord {
@@ -88,11 +89,6 @@ interface SharedReportRecord {
 
 type ShareEventType = 'visit' | 'convert';
 
-function normalizeOwnerId(rawOwnerId: string | undefined): string {
-  const trimmed = (rawOwnerId || '').trim();
-  return trimmed || 'anonymous-default';
-}
-
 function readReportField(payload: LearningReportPayload, key: string): string {
   const value = payload[key];
   return typeof value === 'string' ? value : '';
@@ -168,9 +164,8 @@ class LearningDataRepository {
     }
   }
 
-  getFlashcards(ownerIdRaw: string | undefined, limit = 120): FlashcardRecord[] {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getFlashcards(ownerInput: OwnerInput, limit = 120): FlashcardRecord[] {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 500)) : 120;
     const query = `
       SELECT
@@ -193,9 +188,8 @@ class LearningDataRepository {
     return this.query<FlashcardRecord>('flashcards', 'select_history', query);
   }
 
-  getSentenceHistory(ownerIdRaw: string | undefined, limit = 20): SentenceHistoryRecord[] {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getSentenceHistory(ownerInput: OwnerInput, limit = 20): SentenceHistoryRecord[] {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
     const query = `
       SELECT
@@ -225,9 +219,8 @@ class LearningDataRepository {
     });
   }
 
-  getReadingHistory(ownerIdRaw: string | undefined, limit = 20): ReadingHistoryRecord[] {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getReadingHistory(ownerInput: OwnerInput, limit = 20): ReadingHistoryRecord[] {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
     const query = `
       SELECT
@@ -282,9 +275,8 @@ class LearningDataRepository {
     });
   }
 
-  getQuizHistory(ownerIdRaw: string | undefined, limit = 20): QuizHistoryRecord[] {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getQuizHistory(ownerInput: OwnerInput, limit = 20): QuizHistoryRecord[] {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
     const query = `
       SELECT
@@ -328,9 +320,8 @@ class LearningDataRepository {
     }));
   }
 
-  getReportHistory(ownerIdRaw: string | undefined, limit = 20): Array<LearningReportPayload & { timestamp?: number }> {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getReportHistory(ownerInput: OwnerInput, limit = 20): Array<LearningReportPayload & { timestamp?: number }> {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 200)) : 20;
     const query = `
       SELECT
@@ -356,11 +347,10 @@ class LearningDataRepository {
     });
   }
 
-  createSharedReport(ownerIdRaw: string | undefined, report: LearningReportPayload): { shareId: string } | null {
+  createSharedReport(ownerInput: OwnerInput, report: LearningReportPayload): { shareId: string } | null {
     if (!this.enabled || !this.available) return null;
     const shareId = randomUUID().replace(/-/g, '');
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
 
     const script = `
       INSERT INTO report_shares (
@@ -471,11 +461,10 @@ class LearningDataRepository {
     }
   }
 
-  persistFlashcards(ownerIdRaw: string | undefined, words: FlashcardRecord[]): void {
+  persistFlashcards(ownerInput: OwnerInput, words: FlashcardRecord[]): void {
     if (!Array.isArray(words) || words.length === 0) return;
 
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
 
     const statements = words.map(item => {
       const learningStatus = item.learningStatus || 'new';
@@ -524,9 +513,8 @@ class LearningDataRepository {
     this.execute('flashcards', 'upsert_words', statements.join('\n'));
   }
 
-  persistSentenceAnalysis(ownerIdRaw: string | undefined, sentence: string, analysis: unknown): void {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  persistSentenceAnalysis(ownerInput: OwnerInput, sentence: string, analysis: unknown): void {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const tags = extractGrammarTags(analysis);
 
     const script = `
@@ -547,9 +535,8 @@ class LearningDataRepository {
     this.execute('sentence', 'insert_analysis', script);
   }
 
-  persistReadingContent(ownerIdRaw: string | undefined, payload: ReadingPersistPayload): void {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  persistReadingContent(ownerInput: OwnerInput, payload: ReadingPersistPayload): void {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
 
     const script = `
       INSERT INTO reading_contents (
@@ -575,9 +562,8 @@ class LearningDataRepository {
     this.execute('reading', 'insert_content', script);
   }
 
-  persistQuizGeneration(ownerIdRaw: string | undefined, payload: QuizGenerationPayload): void {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  persistQuizGeneration(ownerInput: OwnerInput, payload: QuizGenerationPayload): void {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
 
     const script = `
       INSERT INTO quiz_attempts (
@@ -604,9 +590,8 @@ class LearningDataRepository {
     this.execute('quiz', 'insert_generation_snapshot', script);
   }
 
-  persistQuizResult(ownerIdRaw: string | undefined, payload: QuizHistoryRecord): void {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  persistQuizResult(ownerInput: OwnerInput, payload: QuizHistoryRecord): void {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const script = `
       INSERT INTO quiz_attempts (
         id, owner_type, owner_id, quiz_type, difficulty, question_count, timed_mode,
@@ -631,9 +616,8 @@ class LearningDataRepository {
     this.execute('quiz', 'insert_result', script);
   }
 
-  persistLearningReport(ownerIdRaw: string | undefined, templateType: string, report: LearningReportPayload): void {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  persistLearningReport(ownerInput: OwnerInput, templateType: string, report: LearningReportPayload): void {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
 
     const script = `
       INSERT INTO learning_reports (
@@ -655,9 +639,8 @@ class LearningDataRepository {
     this.execute('achievements', 'insert_report', script);
   }
 
-  getBackfillStatus(ownerIdRaw: string | undefined): Record<string, number> {
-    const ownerId = normalizeOwnerId(ownerIdRaw);
-    const ownerType = 'anonymous';
+  getBackfillStatus(ownerInput: OwnerInput): Record<string, number> {
+    const { ownerType, ownerId } = normalizeDataOwner(ownerInput);
     const counts = (table: string) => `
       (SELECT COUNT(*) FROM ${table}
         WHERE owner_type = ${SqliteClient.sqlLiteral(ownerType)}
@@ -680,7 +663,7 @@ class LearningDataRepository {
     };
   }
 
-  runBackfill(ownerIdRaw: string | undefined, payload: BackfillPayload): Record<string, number> {
+  runBackfill(ownerInput: OwnerInput, payload: BackfillPayload): Record<string, number> {
     const flashcards = Array.isArray(payload.flashcards) ? payload.flashcards.slice(0, 500) : [];
     const sentenceHistory = Array.isArray(payload.sentenceHistory) ? payload.sentenceHistory.slice(0, 300) : [];
     const readingHistory = Array.isArray(payload.readingHistory) ? payload.readingHistory.slice(0, 300) : [];
@@ -688,16 +671,16 @@ class LearningDataRepository {
     const reportHistory = Array.isArray(payload.reportHistory) ? payload.reportHistory.slice(0, 200) : [];
 
     if (flashcards.length > 0) {
-      this.persistFlashcards(ownerIdRaw, flashcards);
+      this.persistFlashcards(ownerInput, flashcards);
     }
     sentenceHistory.forEach(item => {
       if (typeof item.sentence === 'string') {
-        this.persistSentenceAnalysis(ownerIdRaw, item.sentence, item.result);
+        this.persistSentenceAnalysis(ownerInput, item.sentence, item.result);
       }
     });
     readingHistory.forEach(item => {
       if (typeof item.english === 'string' && typeof item.chinese === 'string') {
-        this.persistReadingContent(ownerIdRaw, {
+        this.persistReadingContent(ownerInput, {
           language: item.generationConfig?.language || 'en',
           topic: item.generationConfig?.topic || 'general',
           difficulty: item.generationConfig?.difficulty || 'medium',
@@ -711,11 +694,11 @@ class LearningDataRepository {
     });
     testHistory.forEach(item => {
       if (item.type === 'reading' || item.type === 'vocabulary') {
-        this.persistQuizResult(ownerIdRaw, item);
+        this.persistQuizResult(ownerInput, item);
       }
     });
     reportHistory.forEach(item => {
-      this.persistLearningReport(ownerIdRaw, item.templateType || 'weekly', item);
+      this.persistLearningReport(ownerInput, item.templateType || 'weekly', item);
     });
 
     return {

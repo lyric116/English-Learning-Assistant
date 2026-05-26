@@ -3,8 +3,10 @@ import { analyzeSentence } from '../services/ai-service';
 import { validateSentenceAnalyzePayload } from '../utils/request-validator';
 import { learningDataRepository } from '../repositories/learning-data-repository';
 import { sendSuccess } from '../utils/response';
+import { getRequestOwner, requestOwnerMiddleware } from '../middleware/request-owner';
 
 export const sentenceRouter = Router();
+sentenceRouter.use(requestOwnerMiddleware);
 
 interface SentenceStructure {
   type: string;
@@ -167,7 +169,7 @@ sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFu
     const result = await analyzeSentence(sentence, aiConfig);
     const normalizedResult = normalizeSentenceAnalysis(result);
     learningDataRepository.persistSentenceAnalysis(
-      req.header('x-anonymous-session-id') || undefined,
+      getRequestOwner(req),
       sentence,
       normalizedResult,
     );
@@ -180,7 +182,7 @@ sentenceRouter.post('/analyze', async (req: Request, res: Response, next: NextFu
 sentenceRouter.get('/history', (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = parseLimit(req.query.limit, 20);
-    const result = learningDataRepository.getSentenceHistory(req.header('x-anonymous-session-id') || undefined, limit);
+    const result = learningDataRepository.getSentenceHistory(getRequestOwner(req), limit);
     sendSuccess(res, result);
   } catch (err) {
     next(err);

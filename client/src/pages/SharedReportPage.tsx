@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { api } from '@/lib/api';
+import { getSharedReportDisplayFields } from '@/lib/report-format';
 import { Trophy, TrendingUp, Target } from 'lucide-react';
 
 interface SharedReportPayload {
@@ -14,11 +15,6 @@ interface SharedReportPayload {
   viewCount: number;
   conversionCount: number;
   createdAt: string;
-}
-
-function asText(value: unknown, fallback = ''): string {
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
 export function SharedReportPage() {
@@ -52,14 +48,13 @@ export function SharedReportPage() {
     };
   }, [shareId]);
 
-  const reportTitle = useMemo(() => {
-    return payload?.title || asText(payload?.report?.title, '学习报告');
-  }, [payload]);
-
-  const period = asText(payload?.report?.period, '近期学习');
-  const summary = payload?.summary || asText(payload?.report?.summary, '保持学习节奏，持续进步。');
-  const averageScore = asText((payload?.report?.tests as { averageScore?: string | number } | undefined)?.averageScore, '-');
-  const readingCount = asText((payload?.report?.reading as { articles?: string | number } | undefined)?.articles, '-');
+  const {
+    reportTitle,
+    period,
+    summary,
+    averageScore,
+    readingCount,
+  } = useMemo(() => getSharedReportDisplayFields(payload), [payload]);
 
   const onStart = () => {
     if (shareId) {

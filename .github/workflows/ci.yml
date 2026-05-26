@@ -33,8 +33,20 @@ jobs:
       - name: Server tests
         run: cd server && npm run test
 
+      - name: Server coverage
+        run: cd server && npm run test:coverage
+
       - name: Server key-flow regression
         run: cd server && npm run test:e2e-flow
+
+      - name: Server AI mock flow regression
+        run: cd server && npm run test:e2e-ai-mock-flow
+
+      - name: Server share flow regression
+        run: cd server && npm run test:e2e-share-flow
+
+      - name: Server rollback drill
+        run: cd server && npm run drill:rollback
 
       - name: Install client deps
         run: cd client && npm ci
@@ -47,3 +59,6 @@ jobs:
 
       - name: Client tests
         run: cd client && npm run test
+
+      - name: Client coverage
+        run: cd client && npm run test:coverage

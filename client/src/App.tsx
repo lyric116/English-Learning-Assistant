@@ -11,33 +11,16 @@ import { AchievementsPage } from '@/pages/AchievementsPage';
 import { SharedReportPage } from '@/pages/SharedReportPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { api } from '@/lib/api';
-
-const BACKFILL_MARK_KEY = 'migration-backfill-v1';
-
-function readLocalArray(key: string): unknown[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+import { BACKFILL_MARK_KEY, collectBackfillPayload, hasBackfillData } from '@/lib/local-storage-migration';
 
 export default function App() {
   useEffect(() => {
     const mark = localStorage.getItem(BACKFILL_MARK_KEY);
     if (mark === 'done' || mark === 'running') return;
 
-    const flashcards = readLocalArray('flashcards');
-    const sentenceHistory = readLocalArray('sentenceHistory');
-    const readingHistory = readLocalArray('readingHistory');
-    const testHistory = readLocalArray('testHistory');
-    const reportHistory = readLocalArray('reportHistory');
-    const hasAnyData = flashcards.length + sentenceHistory.length + readingHistory.length + testHistory.length + reportHistory.length > 0;
+    const backfillPayload = collectBackfillPayload(localStorage);
 
-    if (!hasAnyData) {
+    if (!hasBackfillData(backfillPayload)) {
       localStorage.setItem(BACKFILL_MARK_KEY, 'done');
       return;
     }
@@ -50,13 +33,7 @@ export default function App() {
           localStorage.setItem(BACKFILL_MARK_KEY, 'done');
           return null;
         }
-        return api.migration.backfill({
-          flashcards,
-          sentenceHistory,
-          readingHistory,
-          testHistory,
-          reportHistory,
-        });
+        return api.migration.backfill(backfillPayload);
       })
       .then(() => {
         localStorage.setItem(BACKFILL_MARK_KEY, 'done');

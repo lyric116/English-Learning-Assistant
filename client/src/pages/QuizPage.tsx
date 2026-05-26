@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast-context';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { calculateQuizMetrics } from '@/lib/quiz-scoring';
 import { ModuleSection } from '@/components/layout/ModuleSection';
 import {
   BookOpen, Type, ListChecks, RotateCcw,
@@ -32,58 +33,6 @@ const QUIZ_DIFFICULTY_LABELS: Record<QuizDifficulty, string> = {
   hard: '高阶',
 };
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20];
-
-interface QuizMetrics {
-  total: number;
-  answered: number;
-  unanswered: number;
-  correct: number;
-  incorrect: number;
-  accuracy: number;
-  score: number;
-}
-
-function calculateQuizMetrics(questions: QuizQuestion[], userAnswers: Array<number | null>): QuizMetrics {
-  const total = questions.length;
-  if (total === 0) {
-    return {
-      total: 0,
-      answered: 0,
-      unanswered: 0,
-      correct: 0,
-      incorrect: 0,
-      accuracy: 0,
-      score: 0,
-    };
-  }
-
-  let answered = 0;
-  let correct = 0;
-  questions.forEach((question, index) => {
-    const userAnswer = userAnswers[index];
-    if (typeof userAnswer === 'number') {
-      answered += 1;
-    }
-    if (userAnswer === question.correctIndex) {
-      correct += 1;
-    }
-  });
-
-  const unanswered = total - answered;
-  const incorrect = total - correct;
-  const score = Math.round((correct / total) * 100);
-  const accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-
-  return {
-    total,
-    answered,
-    unanswered,
-    correct,
-    incorrect,
-    accuracy,
-    score,
-  };
-}
 
 function createWrongQuestionId(type: 'reading' | 'vocabulary', question: string): string {
   return `${type}:${question.trim().toLowerCase()}`;

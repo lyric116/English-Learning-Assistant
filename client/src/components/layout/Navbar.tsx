@@ -1,9 +1,21 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
-import { Sun, Moon, GraduationCap, Menu, X, Layers, AlignLeft, BookOpen, ListChecks, Trophy, Settings } from 'lucide-react';
+import {
+  Sun, Moon, GraduationCap, Menu, X, Layers, AlignLeft, BookOpen,
+  ListChecks, Trophy, Settings, LogIn, LogOut, UserCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings/SettingsDialog';
+import { AuthDialog } from '@/components/auth/AuthDialog';
+import { useToast } from '@/components/ui/toast-context';
+import { api } from '@/lib/api';
+import {
+  clearAuthSession,
+  clearLocalLearningCache,
+  getAuthSession,
+  type AuthSession,
+} from '@/lib/auth-session';
 
 const navLinks = [
   { to: '/flashcards', label: '闪卡学习', icon: Layers },
@@ -18,10 +30,22 @@ interface NavbarContentProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  authSession: AuthSession | null;
+  onOpenAuth: () => void;
+  onLogout: () => void;
 }
 
-function NavbarContent({ pathname, theme, onToggleTheme, onOpenSettings }: NavbarContentProps) {
+function NavbarContent({
+  pathname,
+  theme,
+  onToggleTheme,
+  onOpenSettings,
+  authSession,
+  onOpenAuth,
+  onLogout,
+}: NavbarContentProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const accountLabel = authSession?.user.displayName || authSession?.user.email || '登录';
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
@@ -99,6 +123,30 @@ function NavbarContent({ pathname, theme, onToggleTheme, onOpenSettings }: Navba
               <Settings className="h-5 w-5 text-muted-foreground" />
             </button>
 
+            {authSession ? (
+              <div className="hidden md:flex items-center gap-1">
+                <div className="flex max-w-[180px] items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold text-muted-foreground">
+                  <UserCircle className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{accountLabel}</span>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted transition-all duration-300"
+                  aria-label="退出登录"
+                >
+                  <LogOut className="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenAuth}
+                className="hidden md:inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/35"
+              >
+                <LogIn className="h-4 w-4" />
+                登录
+              </button>
+            )}
+
             <button
               className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-muted transition-colors"
               onClick={() => setMobileOpen(prev => !prev)}
@@ -153,6 +201,26 @@ function NavbarContent({ pathname, theme, onToggleTheme, onOpenSettings }: Navba
               <Settings className="h-4 w-4" />
               AI 设置
             </button>
+
+            {authSession ? (
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); onLogout(); }}
+                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                退出登录
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); onOpenAuth(); }}
+                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <LogIn className="h-4 w-4" />
+                登录 / 注册
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -162,8 +230,29 @@ function NavbarContent({ pathname, theme, onToggleTheme, onOpenSettings }: Navba
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
+  const { toast } = useToast();
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(() => getAuthSession());
+
+  useEffect(() => {
+    setAuthSession(getAuthSession());
+  }, [location.pathname]);
+
+  const logout = async () => {
+    try {
+      await api.auth.logout();
+    } catch {
+      // Local logout should still clear stale or expired sessions.
+    } finally {
+      clearAuthSession();
+      clearLocalLearningCache();
+      setAuthSession(null);
+      toast('已退出登录', 'info');
+      window.setTimeout(() => window.location.reload(), 250);
+    }
+  };
 
   return (
     <>
@@ -173,8 +262,12 @@ export function Navbar() {
         theme={theme}
         onToggleTheme={toggle}
         onOpenSettings={() => setSettingsOpen(true)}
+        authSession={authSession}
+        onOpenAuth={() => setAuthOpen(true)}
+        onLogout={logout}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AuthDialog open={authOpen} onClose={() => setAuthOpen(false)} />
     </>
   );
 }

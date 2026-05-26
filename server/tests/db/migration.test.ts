@@ -10,6 +10,8 @@ test('database migration creates core learning and sharing tables', () => {
     FROM sqlite_master
     WHERE type = 'table'
       AND name IN (
+        'users',
+        'sessions',
         'flashcards',
         'sentence_analyses',
         'reading_contents',
@@ -30,6 +32,8 @@ test('database migration creates core learning and sharing tables', () => {
     'report_shares',
     'schema_migrations',
     'sentence_analyses',
+    'sessions',
+    'users',
   ]);
 });
 
@@ -37,6 +41,19 @@ test('database migration records every applied migration file', () => {
   const dbPath = migrateTestDatabase('migration-metadata');
   const rows = querySqliteJson<{ count: number }>(dbPath, 'SELECT COUNT(*) AS count FROM schema_migrations;');
 
-  assert.equal(rows[0]?.count, 3);
+  assert.equal(rows[0]?.count, 4);
 });
 
+test('database migration adds account credential columns', () => {
+  const dbPath = migrateTestDatabase('migration-auth-columns');
+  const rows = querySqliteJson<{ name: string; notnull: number; dflt_value: string | null }>(dbPath, `
+    PRAGMA table_info(users);
+  `);
+
+  const columns = new Map(rows.map(row => [row.name, row]));
+  assert.ok(columns.has('password_hash'));
+  assert.ok(columns.has('password_salt'));
+  assert.equal(columns.get('password_algorithm')?.notnull, 1);
+  assert.equal(columns.get('password_algorithm')?.dflt_value, "'scrypt'");
+  assert.ok(columns.has('last_login_at'));
+});

@@ -10,6 +10,14 @@ interface AuthResponse {
   data: {
     token: string;
     expiresAt: string;
+    importedAnonymousData?: {
+      flashcards: number;
+      sentenceHistory: number;
+      readingHistory: number;
+      quizHistory: number;
+      reportHistory: number;
+      reportShares: number;
+    };
     user: {
       id: string;
       email: string;
@@ -125,4 +133,51 @@ test('POST /api/v1/auth/register validates email and password', async () => {
   });
   assert.equal(weakPassword.status, 400);
   assert.equal(weakPassword.body.code, 'VALIDATION_ERROR');
+});
+
+test('POST /api/v1/auth/register imports current anonymous data into the account', async () => {
+  const sessionId = 'auth-import-anonymous-session';
+  const backfill = await client.post<{ data: { synced: Record<string, number> } }>('/api/v1/migration/backfill', {
+    readingHistory: [{
+      title: 'Anonymous Import Reading',
+      english: 'This anonymous reading should move into the account.',
+      chinese: '这条匿名阅读应该进入账号。',
+      vocabulary: [],
+      timestamp: Date.now(),
+      generationConfig: { language: 'en', topic: 'education', difficulty: 'easy', length: 'short' },
+    }],
+  }, { sessionId });
+
+  assert.equal(backfill.status, 200);
+  assert.equal(backfill.body.data.synced.readingHistory, 1);
+
+  const register = await client.post<AuthResponse>('/api/v1/auth/register', {
+    email: 'auth-import@example.com',
+    password: 'strong-pass-1',
+    anonymousSessionId: sessionId,
+    importAnonymousData: true,
+  });
+
+  assert.equal(register.status, 201);
+  assert.equal(register.body.data.importedAnonymousData?.readingHistory, 1);
+
+  const accountHistory = await client.get<{ data: Array<{ title?: string }> }>('/api/v1/reading/history', {
+    sessionId,
+    headers: { authorization: `Bearer ${register.body.data.token}` },
+  });
+  assert.deepEqual(accountHistory.body.data.map(item => item.title), ['Anonymous Import Reading']);
+
+  const login = await client.post<AuthResponse>('/api/v1/auth/login', {
+    email: 'auth-import@example.com',
+    password: 'strong-pass-1',
+    anonymousSessionId: sessionId,
+    importAnonymousData: true,
+  });
+  assert.equal(login.status, 200);
+
+  const historyAfterSecondImport = await client.get<{ data: Array<{ title?: string }> }>('/api/v1/reading/history', {
+    sessionId,
+    headers: { authorization: `Bearer ${login.body.data.token}` },
+  });
+  assert.deepEqual(historyAfterSecondImport.body.data.map(item => item.title), ['Anonymous Import Reading']);
 });

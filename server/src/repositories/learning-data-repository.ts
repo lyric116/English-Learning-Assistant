@@ -77,6 +77,15 @@ interface BackfillPayload {
   reportHistory?: Array<LearningReportPayload & { templateType?: string }>;
 }
 
+export interface AnonymousImportCounts {
+  flashcards: number;
+  sentenceHistory: number;
+  readingHistory: number;
+  quizHistory: number;
+  reportHistory: number;
+  reportShares: number;
+}
+
 interface SharedReportRecord {
   shareId: string;
   title: string;
@@ -708,6 +717,226 @@ class LearningDataRepository {
       testHistory: testHistory.length,
       reportHistory: reportHistory.length,
     };
+  }
+
+  importAnonymousDataToUser(anonymousSessionIdRaw: string | undefined, userIdRaw: string): AnonymousImportCounts {
+    const anonymousSessionId = (anonymousSessionIdRaw || '').trim();
+    const userId = (userIdRaw || '').trim();
+    const emptyCounts = {
+      flashcards: 0,
+      sentenceHistory: 0,
+      readingHistory: 0,
+      quizHistory: 0,
+      reportHistory: 0,
+      reportShares: 0,
+    };
+
+    if (!anonymousSessionId || !userId || !this.enabled || !this.available) {
+      return emptyCounts;
+    }
+
+    const anonymousOwnerType = 'anonymous';
+    const userOwnerType = 'user';
+    const anonymousOwner = SqliteClient.sqlLiteral(anonymousSessionId);
+    const userOwner = SqliteClient.sqlLiteral(userId);
+    const anonymousType = SqliteClient.sqlLiteral(anonymousOwnerType);
+    const userType = SqliteClient.sqlLiteral(userOwnerType);
+
+    const countQuery = `
+      SELECT
+        (SELECT COUNT(*) FROM flashcards source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}) AS flashcards,
+        (SELECT COUNT(*) FROM sentence_analyses source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}
+            AND NOT EXISTS (
+              SELECT 1 FROM sentence_analyses target
+              WHERE target.owner_type = ${userType}
+                AND target.owner_id = ${userOwner}
+                AND target.sentence_text = source.sentence_text
+                AND target.analysis_json = source.analysis_json
+                AND target.created_at = source.created_at
+            )) AS sentenceHistory,
+        (SELECT COUNT(*) FROM reading_contents source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}
+            AND NOT EXISTS (
+              SELECT 1 FROM reading_contents target
+              WHERE target.owner_type = ${userType}
+                AND target.owner_id = ${userOwner}
+                AND target.english_text = source.english_text
+                AND target.chinese_text = source.chinese_text
+                AND target.created_at = source.created_at
+            )) AS readingHistory,
+        (SELECT COUNT(*) FROM quiz_attempts source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}
+            AND NOT EXISTS (
+              SELECT 1 FROM quiz_attempts target
+              WHERE target.owner_type = ${userType}
+                AND target.owner_id = ${userOwner}
+                AND target.quiz_type = source.quiz_type
+                AND target.created_at = source.created_at
+                AND COALESCE(target.reading_title, '') = COALESCE(source.reading_title, '')
+            )) AS quizHistory,
+        (SELECT COUNT(*) FROM learning_reports source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}
+            AND NOT EXISTS (
+              SELECT 1 FROM learning_reports target
+              WHERE target.owner_type = ${userType}
+                AND target.owner_id = ${userOwner}
+                AND target.template_type = source.template_type
+                AND target.report_json = source.report_json
+                AND target.created_at = source.created_at
+            )) AS reportHistory,
+        (SELECT COUNT(*) FROM report_shares source
+          WHERE source.owner_type = ${anonymousType}
+            AND source.owner_id = ${anonymousOwner}
+            AND NOT EXISTS (
+              SELECT 1 FROM report_shares target
+              WHERE target.owner_type = ${userType}
+                AND target.owner_id = ${userOwner}
+                AND target.report_json = source.report_json
+                AND target.created_at = source.created_at
+            )) AS reportShares;
+    `;
+
+    const counts = this.query<AnonymousImportCounts>('auth_import', 'count_anonymous_candidates', countQuery)[0] || emptyCounts;
+    const script = `
+      BEGIN;
+
+      INSERT INTO flashcards (
+        id, owner_type, owner_id, word, phonetic, definition, etymology, example, example_translation,
+        learning_status, accuracy, review_count, next_review_at, source_text_hash, created_at, updated_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, word, phonetic, definition, etymology,
+        example, example_translation, learning_status, accuracy, review_count, next_review_at,
+        source_text_hash, created_at, updated_at
+      FROM flashcards
+      WHERE owner_type = ${anonymousType}
+        AND owner_id = ${anonymousOwner}
+      ON CONFLICT(owner_type, owner_id, word) DO UPDATE SET
+        phonetic = excluded.phonetic,
+        definition = excluded.definition,
+        etymology = excluded.etymology,
+        example = excluded.example,
+        example_translation = excluded.example_translation,
+        learning_status = excluded.learning_status,
+        accuracy = excluded.accuracy,
+        review_count = excluded.review_count,
+        next_review_at = excluded.next_review_at,
+        updated_at = datetime('now');
+
+      INSERT INTO sentence_analyses (
+        id, owner_type, owner_id, sentence_text, analysis_json, grammar_tags, created_at, updated_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, source.sentence_text,
+        source.analysis_json, source.grammar_tags, source.created_at, source.updated_at
+      FROM sentence_analyses source
+      WHERE source.owner_type = ${anonymousType}
+        AND source.owner_id = ${anonymousOwner}
+        AND NOT EXISTS (
+          SELECT 1 FROM sentence_analyses target
+          WHERE target.owner_type = ${userType}
+            AND target.owner_id = ${userOwner}
+            AND target.sentence_text = source.sentence_text
+            AND target.analysis_json = source.analysis_json
+            AND target.created_at = source.created_at
+        );
+
+      INSERT INTO reading_contents (
+        id, owner_type, owner_id, title, english_text, chinese_text, topic, difficulty,
+        length, language, vocabulary_json, created_at, updated_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, source.title, source.english_text,
+        source.chinese_text, source.topic, source.difficulty, source.length, source.language,
+        source.vocabulary_json, source.created_at, source.updated_at
+      FROM reading_contents source
+      WHERE source.owner_type = ${anonymousType}
+        AND source.owner_id = ${anonymousOwner}
+        AND NOT EXISTS (
+          SELECT 1 FROM reading_contents target
+          WHERE target.owner_type = ${userType}
+            AND target.owner_id = ${userOwner}
+            AND target.english_text = source.english_text
+            AND target.chinese_text = source.chinese_text
+            AND target.created_at = source.created_at
+        );
+
+      INSERT INTO quiz_attempts (
+        id, owner_type, owner_id, quiz_type, difficulty, question_count, timed_mode,
+        time_limit_minutes, time_spent_seconds, score, accuracy, reading_id, reading_title, created_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, source.quiz_type, source.difficulty,
+        source.question_count, source.timed_mode, source.time_limit_minutes, source.time_spent_seconds,
+        source.score, source.accuracy, NULL, source.reading_title, source.created_at
+      FROM quiz_attempts source
+      WHERE source.owner_type = ${anonymousType}
+        AND source.owner_id = ${anonymousOwner}
+        AND NOT EXISTS (
+          SELECT 1 FROM quiz_attempts target
+          WHERE target.owner_type = ${userType}
+            AND target.owner_id = ${userOwner}
+            AND target.quiz_type = source.quiz_type
+            AND target.created_at = source.created_at
+            AND COALESCE(target.reading_title, '') = COALESCE(source.reading_title, '')
+        );
+
+      INSERT INTO learning_reports (
+        id, owner_type, owner_id, template_type, title, period, summary, report_json, share_text, created_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, source.template_type,
+        source.title, source.period, source.summary, source.report_json, source.share_text, source.created_at
+      FROM learning_reports source
+      WHERE source.owner_type = ${anonymousType}
+        AND source.owner_id = ${anonymousOwner}
+        AND NOT EXISTS (
+          SELECT 1 FROM learning_reports target
+          WHERE target.owner_type = ${userType}
+            AND target.owner_id = ${userOwner}
+            AND target.template_type = source.template_type
+            AND target.report_json = source.report_json
+            AND target.created_at = source.created_at
+        );
+
+      INSERT INTO report_shares (
+        id, owner_type, owner_id, title, summary, report_json, view_count, conversion_count,
+        created_at, updated_at, last_view_at, last_conversion_at
+      )
+      SELECT
+        lower(hex(randomblob(16))), ${userType}, ${userOwner}, source.title, source.summary,
+        source.report_json, source.view_count, source.conversion_count, source.created_at,
+        source.updated_at, source.last_view_at, source.last_conversion_at
+      FROM report_shares source
+      WHERE source.owner_type = ${anonymousType}
+        AND source.owner_id = ${anonymousOwner}
+        AND NOT EXISTS (
+          SELECT 1 FROM report_shares target
+          WHERE target.owner_type = ${userType}
+            AND target.owner_id = ${userOwner}
+            AND target.report_json = source.report_json
+            AND target.created_at = source.created_at
+        );
+
+      COMMIT;
+    `;
+
+    try {
+      this.sqlite.execute(script);
+      logger.info('repository.write.ok', { module: 'auth_import', action: 'copy_anonymous_to_user', counts });
+      return counts;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('repository.write.failed', { module: 'auth_import', action: 'copy_anonymous_to_user', error: message });
+      return emptyCounts;
+    }
   }
 }
 

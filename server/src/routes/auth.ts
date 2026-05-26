@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authRepository } from '../repositories/auth-repository';
+import { learningDataRepository } from '../repositories/learning-data-repository';
 import { readBearerToken, validateLoginPayload, validateRegisterPayload } from '../utils/auth';
 import { sendError, sendSuccess } from '../utils/response';
 
@@ -22,7 +23,11 @@ authRouter.post('/register', (req: Request, res: Response, next: NextFunction) =
       return;
     }
 
-    sendSuccess(res, result, { status: 201, code: 'REGISTERED', message: 'registered' });
+    const importedAnonymousData = payload.importAnonymousData
+      ? learningDataRepository.importAnonymousDataToUser(payload.anonymousSessionId, result.user.id)
+      : learningDataRepository.importAnonymousDataToUser(undefined, result.user.id);
+
+    sendSuccess(res, { ...result, importedAnonymousData }, { status: 201, code: 'REGISTERED', message: 'registered' });
   } catch (err) {
     next(err);
   }
@@ -39,7 +44,11 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    sendSuccess(res, result, { code: 'LOGGED_IN', message: 'logged in' });
+    const importedAnonymousData = payload.importAnonymousData
+      ? learningDataRepository.importAnonymousDataToUser(payload.anonymousSessionId, result.user.id)
+      : learningDataRepository.importAnonymousDataToUser(undefined, result.user.id);
+
+    sendSuccess(res, { ...result, importedAnonymousData }, { code: 'LOGGED_IN', message: 'logged in' });
   } catch (err) {
     next(err);
   }

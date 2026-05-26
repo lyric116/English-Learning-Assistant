@@ -10,6 +10,7 @@ import { readingRouter } from './routes/reading';
 import { quizRouter } from './routes/quiz';
 import { reportRouter } from './routes/report';
 import { migrationRouter } from './routes/migration';
+import { authRouter } from './routes/auth';
 import { testConnection } from './services/ai-service';
 import { validateAiTestPayload } from './utils/request-validator';
 import { sendError, sendSuccess } from './utils/response';
@@ -35,6 +36,10 @@ app.get('/api/v1', (_req, res) => {
     version: 'v1',
     endpoints: [
       'GET /api/v1/health',
+      'POST /api/v1/auth/register',
+      'POST /api/v1/auth/login',
+      'GET /api/v1/auth/me',
+      'POST /api/v1/auth/logout',
       'POST /api/v1/ai/test',
       'POST /api/v1/flashcards/extract',
       'POST /api/v1/sentence/analyze',
@@ -63,6 +68,7 @@ app.post('/api/v1/ai/test', async (req, res, next) => {
 });
 
 // Routes
+app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/flashcards', flashcardsRouter);
 app.use('/api/v1/sentence', sentenceRouter);
 app.use('/api/v1/reading', readingRouter);
